@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+[commands]
+upgrade_type = security
+random_sleep = 3600
+download_updates = yes
+apply_updates = yes
+reboot = {{ 'when-needed' if common_auto_updates_reboot else 'never' }}
+
+[emitters]
+emit_via = stdio
+
+[base]
+debuglevel = 1

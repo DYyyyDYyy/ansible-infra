@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+#
+# sshd uses the FIRST value it reads for each keyword. The Include line sits at
+# the top of sshd_config and drop-ins are read in lexical order, so this 10-
+# file wins over distro defaults such as 50-redhat.conf.
+Port {{ common_sshd_port }}
+
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+
+MaxAuthTries {{ common_sshd_max_auth_tries }}
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PermitTunnel no
+{% if common_sshd_allow_groups %}
+
+AllowGroups {{ common_sshd_allow_groups | join(' ') }}
+{% endif %}

@@ -1,0 +1,11 @@
+---
+common_base_packages:
+  - sudo
+  - acl
+  - ca-certificates
+  - curl
+  - openssh-server
+  - rsync
+  - vim-minimal
+  - dnf-automatic
+common_sshd_service: sshd

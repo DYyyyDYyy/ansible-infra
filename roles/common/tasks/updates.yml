@@ -1,0 +1,43 @@
+---
+- name: Configure unattended-upgrades (Debian)
+  when: ansible_facts['os_family'] == 'Debian'
+  block:
+    - name: Enable the periodic apt jobs
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          // Managed by Ansible (role: common). Local changes will be overwritten.
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+        owner: root
+        group: root
+        mode: "0644"
+
+    # The stock 50unattended-upgrades already limits upgrades to the security
+    # origin; this file only overrides the reboot policy.
+    - name: Set the reboot policy
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/52unattended-upgrades-local
+        content: |
+          // Managed by Ansible (role: common). Local changes will be overwritten.
+          Unattended-Upgrade::Automatic-Reboot "{{ common_auto_updates_reboot | lower }}";
+        owner: root
+        group: root
+        mode: "0644"
+
+- name: Configure dnf-automatic (RedHat)
+  when: ansible_facts['os_family'] == 'RedHat'
+  block:
+    - name: Write dnf-automatic config
+      ansible.builtin.template:
+        src: dnf-automatic.conf.j2
+        dest: /etc/dnf/automatic.conf
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable the dnf-automatic timer
+      ansible.builtin.systemd_service:
+        name: dnf-automatic.timer
+        state: started
+        enabled: true

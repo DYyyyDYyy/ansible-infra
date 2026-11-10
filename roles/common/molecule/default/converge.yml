@@ -1,0 +1,10 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    common_admin_users:
+      - name: alice
+        ssh_keys:
+          - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPGUGm97s3pt+RQKVDvbnWCqbt4VID1iN9qxTVl3YLvt molecule-test
+  roles:
+    - role: common

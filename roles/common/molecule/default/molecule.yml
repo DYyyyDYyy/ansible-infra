@@ -1,0 +1,4 @@
+---
+# Platforms, driver and verifier come from .config/molecule/config.yml
+scenario:
+  name: default

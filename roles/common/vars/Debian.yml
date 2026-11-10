@@ -1,0 +1,11 @@
+---
+common_base_packages:
+  - sudo
+  - acl  # lets Ansible become an unprivileged user (e.g. postgres) without world-readable temp files
+  - ca-certificates
+  - curl
+  - openssh-server
+  - rsync
+  - vim-tiny
+  - unattended-upgrades
+common_sshd_service: ssh
