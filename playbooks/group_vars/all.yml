@@ -1,0 +1,17 @@
+---
+# Settings shared by every environment, derived from the inventory groups.
+# Environment-specific values (connection, IPs, secrets) are in inventories/<env>/.
+#
+# Note: group_vars next to the playbook take precedence over inventory
+# group_vars, so do not try to override these from inventories/<env>/.
+
+app_port: 8000
+app_db_name: transport_firm
+app_db_user: transport
+app_db_password: "{{ vault_db_password }}"
+app_db_host: "{{ hostvars[groups['db'][0]]['private_ip'] }}"
+
+# Here and not in lb.yml: deploy.yml renders the upstream while running on an
+# app host, and delegate_to keeps the vars of the delegating host.
+nginx_upstream_hosts: "{{ groups['app'] }}"
+nginx_upstream_port: "{{ app_port }}"

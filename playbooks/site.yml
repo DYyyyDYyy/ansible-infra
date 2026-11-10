@@ -1,0 +1,27 @@
+---
+# Converge every host to the desired state. Safe to re-run: a second run
+# reports changed=0 (checked in CI by scripts/check-idempotence.sh).
+
+- name: Baseline for every host
+  hosts: all
+  become: true
+  roles:
+    - common
+    - firewall
+
+- name: Database
+  hosts: db
+  become: true
+  roles:
+    - postgresql
+
+- name: Load balancer
+  hosts: lb
+  become: true
+  roles:
+    - nginx
+
+# The app tier always goes through the rolling deploy, so changing
+# app_version and re-running site.yml never takes both servers down.
+- name: App servers
+  ansible.builtin.import_playbook: deploy.yml

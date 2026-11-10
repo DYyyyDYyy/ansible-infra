@@ -1,0 +1,66 @@
+---
+# Create or remove the docker lab described by inventories/docker: one
+# systemd container per inventory host, attached to a private network with
+# the host's private_ip.
+#
+#   make lab-up    (lab_state=present)
+#   make lab-down  (lab_state=absent)
+#
+# Privileged containers with the host cgroup namespace are what systemd
+# needs to run as PID 1. Fine for a throwaway lab, never for anything else.
+
+- name: Docker lab
+  hosts: localhost
+  gather_facts: false
+  vars:
+    # The lab group sets ansible_connection for its hosts; run this play
+    # locally, with the Python that has the docker SDK (the venv).
+    ansible_connection: local
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    lab_state: present
+    lab_network: ansible-infra-lab
+    lab_subnet: 10.10.20.0/24
+  tasks:
+    - name: Create the lab network
+      community.docker.docker_network:
+        name: "{{ lab_network }}"
+        ipam_config:
+          - subnet: "{{ lab_subnet }}"
+      when: lab_state == 'present'
+
+    - name: Start or remove the containers, lab_state={{ lab_state }}
+      community.docker.docker_container:
+        name: "{{ hostvars[item]['ansible_host'] }}"
+        hostname: "{{ item }}"
+        image: "{{ hostvars[item]['lab_image'] }}"
+        state: "{{ 'started' if lab_state == 'present' else 'absent' }}"
+        privileged: true
+        cgroupns_mode: host
+        volumes:
+          - /sys/fs/cgroup:/sys/fs/cgroup:rw
+        networks:
+          - name: "{{ lab_network }}"
+            ipv4_address: "{{ hostvars[item]['private_ip'] }}"
+        networks_cli_compatible: true
+        published_ports: "{{ hostvars[item]['lab_published_ports'] | default([]) }}"
+        restart_policy: "no"
+        force_kill: true
+      loop: "{{ groups['lab'] }}"
+
+    # "degraded" is expected: a few units (getty, kernel modules) cannot work
+    # in a container and are irrelevant here.
+    - name: Wait for systemd to finish booting
+      community.docker.docker_container_exec:
+        container: "{{ hostvars[item]['ansible_host'] }}"
+        command: timeout 90 systemctl is-system-running --wait
+      register: lab_boot
+      changed_when: false
+      failed_when: lab_boot.stdout not in ['running', 'degraded']
+      loop: "{{ groups['lab'] }}"
+      when: lab_state == 'present'
+
+    - name: Remove the lab network
+      community.docker.docker_network:
+        name: "{{ lab_network }}"
+        state: absent
+      when: lab_state == 'absent'
