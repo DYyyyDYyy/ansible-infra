@@ -1,0 +1,17 @@
+---
+postgresql_listen_addresses: "localhost,{{ private_ip }}"
+postgresql_users:
+  - name: "{{ app_db_user }}"
+    password: "{{ app_db_password }}"
+postgresql_databases:
+  - name: "{{ app_db_name }}"
+    owner: "{{ app_db_user }}"
+postgresql_hba_entries:
+  - database: "{{ app_db_name }}"
+    user: "{{ app_db_user }}"
+    address: "{{ groups['app'] | map('extract', hostvars, 'private_ip') | map('regex_replace', '$', '/32') | list }}"
+
+firewall_rules:
+  - name: postgres-from-app
+    port: 5432
+    sources: "{{ groups['app'] | map('extract', hostvars, 'private_ip') | list }}"

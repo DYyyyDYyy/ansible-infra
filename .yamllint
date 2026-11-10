@@ -18,5 +18,6 @@ rules:
 
 ignore: |
   .venv/
+  inventories/*/group_vars/all/vault.yml
   .collections/
   .cache/

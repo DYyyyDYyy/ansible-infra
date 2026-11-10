@@ -1,0 +1,64 @@
+---
+# Rolling deploy of the app servers, one at a time:
+#   build release -> drain from nginx -> switch + restart -> health/smoke test
+#   -> back into nginx. If anything after the drain fails, the host is rolled
+#   back to its previous release, returned to nginx, and the rollout stops so
+#   the remaining hosts keep the old, working version.
+#
+#   make deploy VERSION=<commit sha or tag>
+
+- name: Rolling deploy of the app servers
+  hosts: app
+  become: true
+  serial: 1
+  max_fail_percentage: 0
+  vars:
+    deploy_lb: "{{ groups['lb'][0] }}"
+  tasks:
+    - name: Build the release while the host still serves traffic
+      ansible.builtin.include_role:
+        name: app
+        tasks_from: build
+        public: true  # expose the role's defaults and facts to the tasks below
+
+    - name: Activate, or roll back on failure
+      block:
+        - name: Take the host out of the load balancer
+          ansible.builtin.include_role:
+            name: nginx
+            tasks_from: upstream
+            apply:
+              delegate_to: "{{ deploy_lb }}"
+          vars:
+            nginx_upstream_down: ["{{ inventory_hostname }}"]
+          when: app_is_new_release
+
+        - name: Switch to the new release
+          ansible.builtin.include_role:
+            name: app
+            tasks_from: activate
+
+      rescue:
+        - name: Roll back to the previous release
+          ansible.builtin.include_role:
+            name: app
+            tasks_from: rollback
+          when: app_previous_release | length > 0
+
+        - name: Stop the rollout
+          ansible.builtin.fail:
+            msg: >-
+              {{ app_version }} failed on {{ inventory_hostname }}
+              ({{ ansible_failed_task.name | default('unknown task') }}).
+              {{ 'Rolled back to ' ~ (app_previous_release | basename) ~ '.' if app_previous_release else 'Nothing to roll back to.' }}
+
+      always:
+        - name: Put the host back into the load balancer
+          ansible.builtin.include_role:
+            name: nginx
+            tasks_from: upstream
+            apply:
+              delegate_to: "{{ deploy_lb }}"
+          vars:
+            nginx_upstream_down: []
+          when: app_is_new_release

@@ -1,0 +1,4 @@
+---
+firewall_rules:
+  - name: http
+    port: 80
