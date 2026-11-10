@@ -63,7 +63,7 @@ vault-init: venv $(VAULT_FILE) ## Generate and encrypt this environment's secret
 
 up: venv $(VAULT_FILE) ## Create the machines and provision everything
 ifeq ($(ENV),vagrant)
-	vagrant up --no-provision
+	vagrant up
 else
 	$(MAKE) lab-up
 endif
