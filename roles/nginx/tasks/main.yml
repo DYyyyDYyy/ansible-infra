@@ -14,13 +14,21 @@
     state: present
 
 # On Rocky SELinux stays enforcing; it blocks nginx from opening connections
-# to the app port until this boolean is set.
+# to the app port until this boolean is set. (Not covered by Molecule or the
+# docker lab: SELinux is disabled in containers. Runs on the Vagrant VMs.)
 - name: Allow nginx to connect to upstreams (SELinux)
-  ansible.posix.seboolean:
-    name: httpd_can_network_connect
-    state: true
-    persistent: true
   when: ansible_facts['selinux']['status'] | default('disabled') == 'enabled'
+  block:
+    - name: Install the Python bindings the seboolean module needs
+      ansible.builtin.package:
+        name: python3-libsemanage
+        state: present
+
+    - name: Set httpd_can_network_connect
+      ansible.posix.seboolean:
+        name: httpd_can_network_connect
+        state: true
+        persistent: true
 
 # Same main config on both distros. It only includes conf.d/, so the Debian
 # sites-enabled/default and the EL built-in server block are not loaded.
