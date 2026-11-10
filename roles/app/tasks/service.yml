@@ -1,0 +1,54 @@
+---
+- name: Read the current release
+  ansible.builtin.stat:
+    path: "{{ app_home }}/current"
+  register: app_current
+
+# Remembered for tasks/rollback.yml
+- name: Remember the previous release
+  ansible.builtin.set_fact:
+    app_previous_release: "{{ app_current.stat.lnk_source | default('') }}"
+    app_is_new_release: "{{ app_current.stat.lnk_source | default('') != app_release_dir }}"
+
+- name: Install the systemd unit
+  ansible.builtin.template:
+    src: app.service.j2
+    dest: /etc/systemd/system/{{ app_name }}.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart app
+
+# The symlink is replaced with rename(2), so `current` is never missing.
+- name: Switch current to {{ app_version }}
+  ansible.builtin.file:
+    src: "{{ app_release_dir }}"
+    dest: "{{ app_home }}/current"
+    state: link
+    force: true
+  notify: Restart app
+
+- name: Enable and start the service
+  ansible.builtin.systemd_service:
+    name: "{{ app_name }}"
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Apply a pending restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait until the app answers on {{ app_health_path }}
+  ansible.builtin.uri:
+    url: http://{{ app_bind_address }}:{{ app_port }}{{ app_health_path }}
+  register: app_health
+  until: app_health.status == 200
+  retries: "{{ app_health_retries }}"
+  delay: 1
+  changed_when: false
+
+- name: Smoke-test the new release on {{ app_smoke_test_path }}
+  ansible.builtin.uri:
+    url: http://{{ app_bind_address }}:{{ app_port }}{{ app_smoke_test_path }}
+  changed_when: false
+  when: app_is_new_release

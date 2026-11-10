@@ -1,0 +1,19 @@
+---
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Install git and Python
+  ansible.builtin.package:
+    name: "{{ app_packages }}"
+    state: present
+
+- name: Create the service account
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ app_home }}"
+    create_home: false

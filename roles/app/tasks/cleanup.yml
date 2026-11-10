@@ -1,0 +1,19 @@
+---
+- name: List releases
+  ansible.builtin.find:
+    paths: "{{ app_home }}/releases"
+    file_type: directory
+  register: app_releases
+
+# Newest first; everything past the first app_keep_releases goes, except the
+# release now running and the one a rollback would return to.
+- name: Remove releases beyond the newest {{ app_keep_releases }}
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ app_releases.files | sort(attribute='mtime', reverse=true) | map(attribute='path') | list }}"
+  loop_control:
+    index_var: app_release_index
+  when:
+    - app_release_index >= app_keep_releases | int
+    - item not in [app_release_dir, app_previous_release]

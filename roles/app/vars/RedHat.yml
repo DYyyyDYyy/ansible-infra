@@ -1,0 +1,4 @@
+---
+app_packages:
+  - git-core
+  - python3

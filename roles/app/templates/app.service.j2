@@ -1,0 +1,52 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Transport Firm REST API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User={{ app_user }}
+Group={{ app_user }}
+# `current` is resolved at start, so a restart picks up the new release.
+WorkingDirectory={{ app_home }}/current
+EnvironmentFile=/etc/{{ app_name }}.env
+ExecStart={{ app_home }}/current/.venv/bin/uvicorn app.main:app \
+    --host {{ app_bind_address }} --port {{ app_port }} \
+    --workers {{ app_workers }} \
+    --proxy-headers --forwarded-allow-ips {{ app_forwarded_allow_ips }} \
+    --timeout-graceful-shutdown 10 --no-server-header
+Restart=on-failure
+RestartSec=2
+# SIGTERM lets uvicorn finish in-flight requests first
+TimeoutStopSec=20
+
+# --- Sandboxing (see `systemd-analyze security {{ app_name }}`) ---
+# no setuid/capability escalation, ever
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+# whole filesystem read-only, /home and /root invisible, private /tmp and /dev
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+# no touching the kernel, clock, hostname or cgroups
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+# only IP and Unix sockets; no namespaces, realtime or setuid files
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
