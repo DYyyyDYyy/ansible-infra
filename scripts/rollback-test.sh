@@ -24,11 +24,8 @@ echo "==> 1/3 deploy the good version $good"
 ansible-playbook "$@" playbooks/deploy.yml -e "app_version=$good"
 
 echo "==> 2/3 deploy $bad with a failing smoke test (this deploy must fail)"
-if scripts/zero-downtime.sh "$lb_url/vehicles" -- \
-    ansible-playbook "$@" playbooks/deploy.yml -e "app_version=$bad" -e app_smoke_test_path=/no-such-page; then
-    echo "FAIL: the broken deploy succeeded" >&2
-    exit 1
-fi
+scripts/zero-downtime.sh --expect-failure "$lb_url/vehicles" -- \
+    ansible-playbook "$@" playbooks/deploy.yml -e "app_version=$bad" -e app_smoke_test_path=/no-such-page
 
 echo "==> 3/3 check the state after the failed deploy"
 inv=("$@")

@@ -1,26 +1,36 @@
 #!/usr/bin/env bash
 # Hammer a URL while a command runs and count the failed requests.
 #
-#   scripts/zero-downtime.sh http://127.0.0.1:8080/vehicles -- make deploy VERSION=...
+#   scripts/zero-downtime.sh [--expect-failure] <url> -- <command...>
 #
-# Exits non-zero if the command failed or if any request got something other
-# than HTTP 200 (including connection errors and timeouts).
+# Fails if any request got something other than HTTP 200 (connection errors
+# and timeouts count as failures). Also fails if the command fails, or, with
+# --expect-failure, if the command succeeds (used by the rollback test).
 set -euo pipefail
 
-url=${1:?usage: $0 <url> -- <command...>}
+usage() { echo "usage: $0 [--expect-failure] <url> -- <command...>" >&2; exit 2; }
+
+expect_failure=false
+if [[ ${1:-} == --expect-failure ]]; then
+    expect_failure=true
+    shift
+fi
+url=${1:-}
+[[ -n $url ]] || usage
 shift
 [[ ${1:-} == -- ]] && shift
-(($# > 0)) || { echo "usage: $0 <url> -- <command...>" >&2; exit 2; }
+(($# > 0)) || usage
 
 log=$(mktemp)
 loop_pid=
+# shellcheck disable=SC2329  # called by the EXIT trap below
 cleanup() {
     [[ -n $loop_pid ]] && kill "$loop_pid" 2>/dev/null
     rm -f "$log"
 }
 trap cleanup EXIT
 
-# Each line: HTTP status (000 = no response), then the time it took.
+# One line per request: HTTP status (000 = no response) and duration.
 (
     while :; do
         curl -s -o /dev/null --max-time 5 -w '%{http_code} %{time_total}\n' "$url" >>"$log" || true
@@ -49,9 +59,21 @@ if ((failed > 0)); then
     awk '$1 != 200 {print "  " $1}' "$log" | sort | uniq -c
 fi
 
-if ((cmd_status != 0)); then
+status=0
+if $expect_failure; then
+    if ((cmd_status == 0)); then
+        echo "FAIL: the command was expected to fail but succeeded" >&2
+        status=1
+    else
+        echo "the command failed as expected (exit $cmd_status)"
+    fi
+elif ((cmd_status != 0)); then
     echo "FAIL: the command exited with $cmd_status" >&2
-    exit "$cmd_status"
+    status=1
 fi
-((failed == 0)) || { echo "FAIL: requests failed during the command" >&2; exit 1; }
-echo "OK: no failed requests"
+if ((failed > 0)); then
+    echo "FAIL: requests failed during the command" >&2
+    status=1
+fi
+((status == 0)) && echo "OK: no failed requests"
+exit "$status"
