@@ -48,10 +48,10 @@ lint: venv ## Run yamllint, ansible-lint and shellcheck
 	ansible-lint
 	$(if $(SCRIPTS),shellcheck $(SCRIPTS))
 
-test: venv ## Run Molecule for every role, or one: make test ROLE=firewall
+test: venv ## Molecule for every role, or: make test ROLE=firewall PLATFORM=rocky10
 	@for role in $(or $(ROLE),$(ROLES)); do \
-		echo "==> molecule test: $$role"; \
-		(cd roles/$$role && molecule test) || exit 1; \
+		echo "==> molecule test: $$role $(PLATFORM)"; \
+		(cd roles/$$role && molecule test $(if $(PLATFORM),--platform-name $(PLATFORM))) || exit 1; \
 	done
 
 ## --- Environments -----------------------------------------------------------

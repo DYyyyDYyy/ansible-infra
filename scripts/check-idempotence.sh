@@ -9,7 +9,7 @@ set -euo pipefail
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
 
-ANSIBLE_NOCOLOR=1 ansible-playbook "$@" | tee "$log"
+ANSIBLE_NOCOLOR=1 ANSIBLE_FORCE_COLOR=0 ansible-playbook "$@" | tee "$log"
 
 if grep -E '^[^ ]+ +: .*changed=[1-9]' "$log"; then
     echo "FAIL: the second run changed something (see the PLAY RECAP above)" >&2
