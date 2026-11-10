@@ -1,0 +1,57 @@
+---
+# Code is owned by root and only readable by the service account, so a
+# compromised app process cannot rewrite itself.
+- name: Create the release directory tree
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ app_home }}"
+    - "{{ app_home }}/releases"
+
+- name: Set release facts
+  ansible.builtin.set_fact:
+    app_release_dir: "{{ app_home }}/releases/{{ app_version }}"
+
+- name: Check out {{ app_version }}
+  ansible.builtin.git:
+    repo: "{{ app_repo }}"
+    dest: "{{ app_release_dir }}"
+    version: "{{ app_version }}"
+    force: false
+    # Do not inherit the caller's umask: `docker exec`, for one, runs with
+    # 0000, which would leave the code world-writable.
+    umask: "0022"
+
+- name: Install Python dependencies into the release venv
+  ansible.builtin.pip:
+    requirements: "{{ app_release_dir }}/requirements.txt"
+    virtualenv: "{{ app_release_dir }}/.venv"
+    virtualenv_command: python3 -m venv
+    umask: "0022"
+
+- name: Write the environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: /etc/{{ app_name }}.env
+    owner: root
+    group: "{{ app_user }}"
+    mode: "0640"
+  diff: false  # contains the database password
+  notify: Restart app
+
+# Runs on one host per batch. Under `serial: 1` that is every host in turn,
+# which is harmless: the second run finds the schema already at head.
+- name: Run database migrations
+  ansible.builtin.command:
+    cmd: "{{ app_release_dir }}/.venv/bin/alembic upgrade head"
+    chdir: "{{ app_release_dir }}"
+  environment:
+    DATABASE_URL: "{{ app_database_url }}"
+  register: app_migrations
+  changed_when: "'Running upgrade' in app_migrations.stderr"
+  run_once: true
+  when: app_run_migrations

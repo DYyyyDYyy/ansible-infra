@@ -1,0 +1,16 @@
+---
+# The app needs a database: put PostgreSQL on the same container.
+- name: Prepare
+  hosts: all
+  vars:
+    postgresql_users:
+      - { name: transport, password: molecule-secret }
+    postgresql_databases:
+      - { name: transport_firm, owner: transport }
+  roles:
+    - role: postgresql
+  tasks:
+    - name: Install curl for the tests (the common role does this on real hosts)
+      ansible.builtin.package:
+        name: curl
+        state: present

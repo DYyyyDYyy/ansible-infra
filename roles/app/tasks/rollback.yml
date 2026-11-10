@@ -1,0 +1,21 @@
+---
+# Called by playbooks/deploy.yml when a deploy fails after the switch.
+- name: Point current back to {{ app_previous_release }}
+  ansible.builtin.file:
+    src: "{{ app_previous_release }}"
+    dest: "{{ app_home }}/current"
+    state: link
+    force: true
+
+- name: Restart on the previous release
+  ansible.builtin.systemd_service:
+    name: "{{ app_name }}"
+    state: restarted
+
+- name: Wait until the previous release is healthy
+  ansible.builtin.uri:
+    url: http://{{ app_bind_address }}:{{ app_port }}{{ app_health_path }}
+  register: app_health
+  until: app_health.status == 200
+  retries: "{{ app_health_retries }}"
+  delay: 1

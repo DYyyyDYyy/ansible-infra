@@ -1,0 +1,23 @@
+---
+- name: Load distro-specific variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Check variables
+  ansible.builtin.assert:
+    that:
+      - app_keep_releases | int >= 2
+      - app_version is regex('^[0-9a-f]{40}$') or app_version is regex('^v?[0-9]')
+    fail_msg: app_version must be a full commit SHA or a version tag; app_keep_releases must be >= 2
+    quiet: true
+
+- name: Install packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Build the release
+  ansible.builtin.import_tasks: release.yml
+
+- name: Configure the service
+  ansible.builtin.import_tasks: service.yml
+
+- name: Remove old releases
+  ansible.builtin.import_tasks: cleanup.yml

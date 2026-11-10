@@ -1,0 +1,36 @@
+---
+app_name: transport-api
+app_user: transport
+app_home: /opt/{{ app_name }}
+
+app_repo: https://github.com/DYyyyDYyy/rest-api-transport-firm.git
+# Must be a tag or a full commit SHA. A branch name would make the same
+# version string mean different code on different days.
+app_version: fd3fea549ecb92ee7ff98fd5638e0ccfcbc4aabc
+
+app_bind_address: 127.0.0.1
+app_port: 8000
+app_workers: 2
+# Proxies whose X-Forwarded-* headers uvicorn trusts (comma-separated).
+app_forwarded_allow_ips: 127.0.0.1
+
+app_db_host: 127.0.0.1
+app_db_port: 5432
+app_db_name: transport_firm
+app_db_user: transport
+app_db_password: ""  # from Ansible Vault
+app_database_url: "postgresql+psycopg2://{{ app_db_user }}:{{ app_db_password | urlencode }}@{{ app_db_host }}:{{ app_db_port }}/{{ app_db_name }}"
+
+app_run_migrations: true
+
+# Liveness check after every (re)start. Switch to /health/ready once the API
+# has an endpoint that also checks the database.
+app_health_path: /health
+# Checked only after switching to a NEW release. A deploy pipeline points this
+# at a smoke test; CI points it at a missing page to exercise the rollback.
+app_smoke_test_path: "{{ app_health_path }}"
+app_health_retries: 20
+
+# Release directories to keep, including the current one. At least 2, so a
+# rollback target always exists.
+app_keep_releases: 3

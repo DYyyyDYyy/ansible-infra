@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  # Each container has its own database here, while in the real topology the
+  # app servers share one. `run_once` migrations would only reach the first
+  # container, so make every host its own batch, exactly as deploy.yml does.
+  serial: 1
+  vars:
+    app_db_password: molecule-secret
+  roles:
+    - role: app
