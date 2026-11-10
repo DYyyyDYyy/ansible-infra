@@ -1,0 +1,3 @@
+---
+# nftables.service on EL loads this file instead of /etc/nftables.conf
+firewall_config_path: /etc/sysconfig/nftables.conf

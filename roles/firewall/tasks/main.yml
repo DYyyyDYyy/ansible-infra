@@ -1,0 +1,55 @@
+---
+- name: Load distro-specific variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Check firewall_rules
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.port is defined
+      - item.proto | default('tcp') in ['tcp', 'udp']
+    fail_msg: "Each firewall rule needs name and port, proto must be tcp or udp: {{ item }}"
+    quiet: true
+  loop: "{{ firewall_rules }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Install nftables
+  ansible.builtin.package:
+    name: nftables
+    state: present
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+# Two firewall managers on one host fight over the same kernel ruleset.
+- name: Stop and mask firewalld
+  ansible.builtin.systemd_service:
+    name: firewalld
+    state: stopped
+    enabled: false
+    masked: true
+  when: "'firewalld.service' in ansible_facts['services']"
+
+- name: Write the nftables ruleset
+  ansible.builtin.template:
+    src: nftables.conf.j2
+    dest: "{{ firewall_config_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+    # dry run: a ruleset with a syntax error never reaches the disk
+    validate: nft -c -f %s
+  notify: Reload nftables
+
+- name: Enable and start nftables
+  ansible.builtin.systemd_service:
+    name: nftables
+    state: started
+    enabled: true

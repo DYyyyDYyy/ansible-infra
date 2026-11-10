@@ -1,0 +1,21 @@
+---
+# Inbound policy is drop. Loopback, established/related traffic, ICMP and SSH
+# are always allowed; everything else must be listed in firewall_rules.
+#
+# WARNING: the generated ruleset starts with `flush ruleset`, which also wipes
+# chains created by Docker, Podman or libvirt. Do not apply this role to hosts
+# that run containers or VMs.
+
+firewall_ssh_port: 22
+# Empty list: SSH from anywhere (keys only, see the common role).
+firewall_ssh_sources: []
+
+# Each rule:
+#   name: shown as the nft rule comment
+#   port: 80, "8000-8010" or a list of ports
+#   proto: tcp (default) or udp
+#   sources: IPv4/IPv6 addresses or CIDRs; empty or missing means anywhere
+firewall_rules: []
+
+# Log dropped packets to the kernel log, rate limited.
+firewall_log_dropped: true

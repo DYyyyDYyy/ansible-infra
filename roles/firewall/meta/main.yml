@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: firewall
+  author: Didukh Sviatoslav
+  description: Host firewall on nftables - default deny inbound, allow rules from variables
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: Debian
+      versions: [trixie]
+    - name: EL
+      versions: ["10"]
+dependencies: []
