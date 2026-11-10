@@ -8,7 +8,8 @@ postgresql_port: 5432
 postgresql_settings: {}
 
 # Network clients (pg_hba "host" lines). Local connections always use peer auth.
-#   - { database: transport, user: transport, address: 10.10.10.11/32 }
+# address may be a single CIDR or a list of them.
+#   - { database: transport, user: transport, address: [10.10.10.11/32, 10.10.10.12/32] }
 postgresql_hba_entries: []
 
 # Passwords should come from Ansible Vault.

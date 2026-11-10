@@ -11,6 +11,6 @@
     postgresql_databases:
       - { name: transport_firm, owner: transport }
     postgresql_hba_entries:
-      - { database: transport_firm, user: transport, address: 192.0.2.0/24 }
+      - { database: transport_firm, user: transport, address: [192.0.2.0/24, 198.51.100.7/32] }
   roles:
     - role: postgresql
