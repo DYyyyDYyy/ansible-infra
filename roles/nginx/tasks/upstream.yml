@@ -1,0 +1,18 @@
+---
+# Called by playbooks/deploy.yml with delegate_to: <lb> to drain or restore a
+# backend. Uses no handlers: handlers would run on the app host, not the lb.
+- name: Write the upstream (down = {{ nginx_upstream_down }})
+  ansible.builtin.template:
+    src: upstream.conf.j2
+    dest: /etc/nginx/conf.d/upstream.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: nginx_upstream_file
+
+# A reload starts new workers with the new upstream list; old workers finish
+# the requests they already have and exit. Nothing in flight is dropped.
+- name: Check and reload nginx  # noqa: no-handler (see comment above: a handler would run on the wrong host)
+  ansible.builtin.shell: nginx -t && systemctl reload nginx
+  changed_when: true
+  when: nginx_upstream_file is changed

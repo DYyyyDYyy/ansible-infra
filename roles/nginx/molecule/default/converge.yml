@@ -1,0 +1,17 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    nginx_upstream_hosts: [backend1, backend2]
+  pre_tasks:
+    # stand-ins for inventory hosts; the template reads hostvars[...].private_ip
+    - name: Register fake backend hosts
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        private_ip: "{{ item.ip }}"
+      loop:
+        - { name: backend1, ip: 127.0.0.1 }
+        - { name: backend2, ip: 127.0.0.2 }
+      changed_when: false
+  roles:
+    - role: nginx
