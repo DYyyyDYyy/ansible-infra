@@ -45,3 +45,4 @@ def test_dropin_settings_applied(host):
 def test_hba_entry_present(host):
     rules = host.run("sudo -u postgres psql -tAc \"select address, netmask from pg_hba_file_rules where 'transport_firm' = any(database)\"")
     assert "192.0.2.0|255.255.255.0" in rules.stdout
+    assert "198.51.100.7|255.255.255.255" in rules.stdout
