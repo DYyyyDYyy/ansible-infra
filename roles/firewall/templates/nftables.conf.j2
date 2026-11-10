@@ -1,0 +1,54 @@
+#!/usr/sbin/nft -f
+# {{ ansible_managed }}
+{#
+  One allow rule per address family: a single nft rule cannot match both
+  `ip saddr` and `ip6 saddr`, because a packet is either IPv4 or IPv6.
+  Rules without sources match both families.
+#}
+{% macro allow(proto, port, sources, name) %}
+{% set port_expr = port if (port is string or port is number) else '{ ' ~ (port | join(', ')) ~ ' }' %}
+{% set v4 = sources | reject('search', ':') | list %}
+{% set v6 = sources | select('search', ':') | list %}
+{% if not sources %}
+        {{ proto }} dport {{ port_expr }} accept comment "{{ name }}"
+{% endif %}
+{% if v4 %}
+        ip saddr { {{ v4 | join(', ') }} } {{ proto }} dport {{ port_expr }} accept comment "{{ name }}"
+{% endif %}
+{% if v6 %}
+        ip6 saddr { {{ v6 | join(', ') }} } {{ proto }} dport {{ port_expr }} accept comment "{{ name }} (v6)"
+{% endif %}
+{% endmacro %}
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        iif "lo" accept
+        ct state established,related accept
+        ct state invalid drop
+
+        # ping, path MTU discovery and IPv6 neighbour discovery need ICMP
+        meta l4proto { icmp, ipv6-icmp } accept
+
+{{ allow('tcp', firewall_ssh_port, firewall_ssh_sources, 'ssh') -}}
+{% for rule in firewall_rules %}
+{% set sources = rule.sources | default([]) %}
+{{ allow(rule.proto | default('tcp'), rule.port, [sources] if sources is string else sources, rule.name) -}}
+{% endfor %}
+{% if firewall_log_dropped %}
+
+        limit rate 10/minute burst 5 packets log prefix "nft-drop: " level info
+{% endif %}
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+    }
+}

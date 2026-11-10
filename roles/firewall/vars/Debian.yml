@@ -1,0 +1,2 @@
+---
+firewall_config_path: /etc/nftables.conf
