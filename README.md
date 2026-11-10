@@ -58,7 +58,7 @@ Everything else (ansible-core, collections, linters, Molecule) is pinned and
 installed into `.venv` by `make venv`.
 
 ```bash
-make up                     # 4 VMs + site.yml (first run ~10 min)
+make up                     # 4 VMs + site.yml
 curl http://10.10.10.10/health
 curl http://10.10.10.10/vehicles
 
@@ -126,13 +126,13 @@ nginx user, the nftables config path, SELinux) live in each role's
 | Deploy | rolling deploy while `curl` hits the load balancer every 20 ms | `make zero-downtime` |
 | Failure | release whose smoke test fails: expect rollback, hosts back in nginx, no failed requests | `make test-rollback` |
 
-Results from a local run of the docker lab:
+Results from local runs (2026-11-10):
 
-| Check | Result |
-|---|---|
-| Second `site.yml` run | `changed=0` on all 4 hosts |
-| Rolling deploy under load | 1938 requests, 0 failed, slowest 94 ms, 0 nginx retries |
-| Failed deploy with rollback | 1116 requests, 0 failed; both hosts on the previous release |
+| Check | Docker lab | Vagrant VMs (SELinux enforcing) |
+|---|---|---|
+| Second `site.yml` run | `changed=0` on all 4 hosts | `changed=0` on all 4 hosts |
+| Rolling deploy under load | 1938 requests, 0 failed, slowest 94 ms, 0 nginx retries | 1183 requests, 0 failed, slowest 45 ms |
+| Failed deploy with rollback | 1116 requests, 0 failed, both hosts on the previous release | 688 requests, 0 failed, both hosts on the previous release |
 
 ## Secrets
 
@@ -187,14 +187,20 @@ Runbooks: [disk full](docs/runbooks/disk-full.md) ·
 - **Migrations are not rolled back.** A failed deploy keeps the new schema and
   relies on migrations being backward compatible (ADR 3).
 - **What the docker lab cannot test:** SELinux, the kernel and boot, SSH as
-  the transport. Those paths only run on the Vagrant VMs (ADR 4).
+  the transport, and packages missing from minimal images. Those paths only
+  run on the Vagrant VMs (ADR 4).
 - **The firewall role flushes the whole ruleset**, so it must not run on hosts
   with Docker, Podman or libvirt.
 - **Lab shortcuts:** `host_key_checking = False` in `ansible.cfg` because the
   VMs are recreated often, and privileged containers in the docker lab.
-- **Vagrant box for Rocky** is downloaded from the Rocky mirror and pinned by
-  checksum, because the `rockylinux/10` catalog entry points at an image that
-  no longer exists.
+- **Rocky on Vagrant needs three workarounds**, all in the `Vagrantfile`: the
+  `rockylinux/10` catalog entry points at an image that no longer exists, so
+  the box comes from the Rocky mirror pinned by checksum; its metadata claims
+  a 5 GB disk for a 10 GiB image, so the disk size is set explicitly; and
+  Vagrant cannot configure networks on EL10 (no ifcfg support), so the
+  private address is set with `nmcli`.
+- **CI does not run the VMs.** GitHub Actions runs the docker lab; the
+  Vagrant path is run by hand before a change is considered done (ADR 4).
 
 ## Roadmap
 
