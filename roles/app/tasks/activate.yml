@@ -1,15 +1,5 @@
 ---
-- name: Read the current release
-  ansible.builtin.stat:
-    path: "{{ app_home }}/current"
-  register: app_current
-
-# Remembered for tasks/rollback.yml
-- name: Remember the previous release
-  ansible.builtin.set_fact:
-    app_previous_release: "{{ app_current.stat.lnk_source | default('') }}"
-    app_is_new_release: "{{ app_current.stat.lnk_source | default('') != app_release_dir }}"
-
+# Switch to the built release, restart and prove it works.
 - name: Install the systemd unit
   ansible.builtin.template:
     src: app.service.j2
@@ -52,3 +42,6 @@
     url: http://{{ app_bind_address }}:{{ app_port }}{{ app_smoke_test_path }}
   changed_when: false
   when: app_is_new_release
+
+- name: Remove old releases
+  ansible.builtin.import_tasks: cleanup.yml

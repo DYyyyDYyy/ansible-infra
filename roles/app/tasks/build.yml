@@ -1,0 +1,29 @@
+---
+# Everything that can happen while the host still serves the old release.
+- name: Load distro-specific variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Check variables
+  ansible.builtin.assert:
+    that:
+      - app_keep_releases | int >= 2
+      - app_version is regex('^[0-9a-f]{40}$') or app_version is regex('^v?[0-9]')
+    fail_msg: app_version must be a full commit SHA or a version tag; app_keep_releases must be >= 2
+    quiet: true
+
+- name: Install packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Check out the code and install dependencies
+  ansible.builtin.import_tasks: release.yml
+
+- name: Read the current release
+  ansible.builtin.stat:
+    path: "{{ app_home }}/current"
+  register: app_current
+
+# app_previous_release is the rollback target for tasks/rollback.yml.
+- name: Compare it with the release being deployed
+  ansible.builtin.set_fact:
+    app_previous_release: "{{ app_current.stat.lnk_source | default('') }}"
+    app_is_new_release: "{{ app_current.stat.lnk_source | default('') != app_release_dir }}"
