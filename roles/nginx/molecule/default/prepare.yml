@@ -1,0 +1,38 @@
+---
+# Two fake backends on the same container, each answering with its own name.
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install curl
+      ansible.builtin.package:
+        name: curl
+        state: present
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: Refresh apt cache and install curl
+      ansible.builtin.apt:
+        name: curl
+        update_cache: true
+      when: ansible_facts['os_family'] == 'Debian'
+
+    - name: Create backend web roots
+      ansible.builtin.file:
+        path: /srv/backend{{ item }}
+        state: directory
+        mode: "0755"
+      loop: [1, 2]
+
+    - name: Write backend pages
+      ansible.builtin.copy:
+        dest: /srv/backend{{ item }}/index.html
+        content: "backend{{ item }}\n"
+        mode: "0644"
+      loop: [1, 2]
+
+    - name: Start fake backends
+      ansible.builtin.command: >-
+        systemd-run --unit backend{{ item }} --property WorkingDirectory=/srv/backend{{ item }}
+        python3 -m http.server --bind 127.0.0.{{ item }} 8000
+      args:
+        creates: /run/systemd/transient/backend{{ item }}.service
+      loop: [1, 2]

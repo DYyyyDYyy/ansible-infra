@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+upstream app_backend {
+    # Shared memory for the upstream state. Without it every worker process
+    # keeps its own round-robin position and failure counters, so with many
+    # workers most first requests land on the first server.
+    zone app_backend 64k;
+
+{% for host in nginx_upstream_hosts %}
+    # {{ host }}
+    server {{ hostvars[host]['private_ip'] }}:{{ nginx_upstream_port }} max_fails=2 fail_timeout=5s{{ ' down' if host in nginx_upstream_down else '' }};
+{% endfor %}
+{% if not nginx_upstream_hosts %}
+    server 127.0.0.1:1 down;  # no backends defined yet
+{% endif %}
+    keepalive 16;
+}

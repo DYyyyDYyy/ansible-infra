@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+server {
+    listen {{ nginx_listen_port }} default_server;
+    listen [::]:{{ nginx_listen_port }} default_server;
+    server_name {{ nginx_server_name }};
+
+    location / {
+        proxy_pass http://app_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";  # enables upstream keepalive
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Passive health check: if a backend refuses or fails, retry the
+        # request on the other one (idempotent methods only, by default).
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+        proxy_next_upstream_tries 2;
+        proxy_connect_timeout 2s;
+        proxy_read_timeout 30s;
+    }
+
+    location = /nginx_status {
+        stub_status;
+        access_log off;
+{% for address in nginx_status_allow %}
+        allow {{ address }};
+{% endfor %}
+        deny all;
+    }
+}

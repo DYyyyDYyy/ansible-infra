@@ -1,0 +1,62 @@
+---
+- name: Load distro-specific variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Install nginx
+  ansible.builtin.package:
+    name: nginx
+    state: present
+
+# On Rocky SELinux stays enforcing; it blocks nginx from opening connections
+# to the app port until this boolean is set.
+- name: Allow nginx to connect to upstreams (SELinux)
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
+  when: ansible_facts['selinux']['status'] | default('disabled') == 'enabled'
+
+# Same main config on both distros. It only includes conf.d/, so the Debian
+# sites-enabled/default and the EL built-in server block are not loaded.
+- name: Write nginx.conf
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Write the site
+  ansible.builtin.template:
+    src: site.conf.j2
+    dest: /etc/nginx/conf.d/site.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Write the upstream
+  ansible.builtin.template:
+    src: upstream.conf.j2
+    dest: /etc/nginx/conf.d/upstream.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Check the config
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
+- name: Enable and start nginx
+  ansible.builtin.systemd_service:
+    name: nginx
+    state: started
+    enabled: true
