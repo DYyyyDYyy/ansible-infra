@@ -30,6 +30,15 @@ The docker lab cannot test:
 - `sshd` as the transport (Ansible uses `docker exec`), although the sshd
   config is still validated with `sshd -t` and `sshd -T`.
 
+- packages missing from a minimal OS image: the test images are built for
+  Ansible and already contain Python libraries that modules need on the
+  target. The first run on the Vagrant boxes found two such gaps that every
+  container test had passed: `python3-libsemanage` for `seboolean` on Rocky
+  and `python3-packaging` for the `pip` module. Both roles now install them.
+
 nftables does work: each container has its own network namespace, so the
 firewall rules are tested for real (the e2e checks that `lb` cannot reach
 PostgreSQL on `db`).
+
+So both environments stay: the docker lab on every push, the VMs before
+calling a change done.
