@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+listen_addresses = '{{ postgresql_listen_addresses }}'
+port = {{ postgresql_port }}
+password_encryption = 'scram-sha-256'
+{% for key, value in postgresql_settings | dictsort %}
+{{ key }} = {{ value if value is number else "'" ~ value ~ "'" }}
+{% endfor %}

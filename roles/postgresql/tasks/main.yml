@@ -1,0 +1,87 @@
+---
+- name: Load distro-specific variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Refresh apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Install PostgreSQL
+  ansible.builtin.package:
+    name: "{{ postgresql_packages }}"
+    state: present
+
+- name: Initialise the cluster (EL)
+  ansible.builtin.command: postgresql-setup --initdb
+  args:
+    creates: "{{ postgresql_data_dir }}/PG_VERSION"
+  when: postgresql_needs_initdb
+
+- name: Create conf.d for drop-in settings
+  ansible.builtin.file:
+    path: "{{ postgresql_config_dir }}/conf.d"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+
+# Debian's postgresql.conf already has this line; EL's does not.
+- name: Read drop-in settings from conf.d
+  ansible.builtin.lineinfile:
+    path: "{{ postgresql_config_dir }}/postgresql.conf"
+    regexp: "^include_dir\\s*="
+    line: "include_dir = 'conf.d'"
+  notify: Restart postgresql
+
+- name: Write settings
+  ansible.builtin.template:
+    src: 90-ansible.conf.j2
+    dest: "{{ postgresql_config_dir }}/conf.d/90-ansible.conf"
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  notify: Restart postgresql
+
+- name: Write pg_hba.conf
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: "{{ postgresql_config_dir }}/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  notify: Reload postgresql
+
+- name: Enable and start PostgreSQL
+  ansible.builtin.systemd_service:
+    name: "{{ postgresql_service }}"
+    state: started
+    enabled: true
+
+# listen_addresses only changes on restart; apply it before clients need it.
+- name: Apply pending config changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Create users
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password | default(omit) }}"
+    login_port: "{{ postgresql_port }}"
+  loop: "{{ postgresql_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+  become: true
+  become_user: postgres
+
+- name: Create databases
+  community.postgresql.postgresql_db:
+    name: "{{ item.name }}"
+    owner: "{{ item.owner | default(omit) }}"
+    login_port: "{{ postgresql_port }}"
+  loop: "{{ postgresql_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  become_user: postgres

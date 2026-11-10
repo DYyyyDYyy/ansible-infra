@@ -1,0 +1,16 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    postgresql_listen_addresses: "*"
+    postgresql_settings:
+      max_connections: 50
+      log_min_duration_statement: 500ms
+    postgresql_users:
+      - { name: transport, password: molecule-secret }
+    postgresql_databases:
+      - { name: transport_firm, owner: transport }
+    postgresql_hba_entries:
+      - { database: transport_firm, user: transport, address: 192.0.2.0/24 }
+  roles:
+    - role: postgresql

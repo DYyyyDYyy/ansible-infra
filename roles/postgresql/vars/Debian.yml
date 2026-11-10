@@ -1,0 +1,10 @@
+---
+postgresql_version: 17
+postgresql_packages:
+  - postgresql
+  - python3-psycopg2  # needed by the community.postgresql modules
+postgresql_service: postgresql
+postgresql_data_dir: /var/lib/postgresql/{{ postgresql_version }}/main
+# Debian keeps config outside the data directory and creates the cluster on install.
+postgresql_config_dir: /etc/postgresql/{{ postgresql_version }}/main
+postgresql_needs_initdb: false

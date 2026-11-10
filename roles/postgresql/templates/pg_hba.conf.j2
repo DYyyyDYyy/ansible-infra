@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# Unix socket: the OS user must match the database user (peer).
+local   all             all                                     peer
+
+# Loopback, password required.
+host    all             all             127.0.0.1/32            scram-sha-256
+host    all             all             ::1/128                 scram-sha-256
+
+# Network clients
+{% for entry in postgresql_hba_entries %}
+host    {{ '%-15s' | format(entry.database) }} {{ '%-15s' | format(entry.user) }} {{ '%-23s' | format(entry.address) }} {{ entry.method | default('scram-sha-256') }}
+{% endfor %}

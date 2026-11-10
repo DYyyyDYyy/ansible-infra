@@ -1,0 +1,10 @@
+---
+postgresql_version: 16
+postgresql_packages:
+  - postgresql-server
+  - python3-psycopg2
+postgresql_service: postgresql
+postgresql_data_dir: /var/lib/pgsql/data
+# EL keeps config inside the data directory and needs an explicit initdb.
+postgresql_config_dir: "{{ postgresql_data_dir }}"
+postgresql_needs_initdb: true
