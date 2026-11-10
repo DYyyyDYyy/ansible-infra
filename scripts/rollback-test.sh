@@ -13,11 +13,12 @@ set -euo pipefail
 lb_url=$1 good=$2 bad=$3
 shift 3
 
+# Prints the release directory name that /opt/transport-api/current points to.
 current_release() {
     local host=$1
     shift
-    ansible "$host" "$@" -m ansible.builtin.command -a 'readlink /opt/transport-api/current' -o 2>/dev/null |
-        sed -n 's/.*(stdout) //p' | xargs basename
+    ansible "$host" "$@" -m ansible.builtin.command -a 'readlink /opt/transport-api/current' 2>/dev/null |
+        tail -n 1 | xargs basename
 }
 
 echo "==> 1/3 deploy the good version $good"

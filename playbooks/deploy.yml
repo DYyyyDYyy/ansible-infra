@@ -13,7 +13,7 @@
   serial: 1
   max_fail_percentage: 0
   vars:
-    deploy_lb: "{{ groups['lb'][0] }}"
+    deploy_lb: "{{ groups['loadbalancer'][0] }}"
   tasks:
     - name: Build the release while the host still serves traffic
       ansible.builtin.include_role:

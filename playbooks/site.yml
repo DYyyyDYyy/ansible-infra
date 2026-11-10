@@ -10,13 +10,13 @@
     - firewall
 
 - name: Database
-  hosts: db
+  hosts: database
   become: true
   roles:
     - postgresql
 
 - name: Load balancer
-  hosts: lb
+  hosts: loadbalancer
   become: true
   roles:
     - nginx

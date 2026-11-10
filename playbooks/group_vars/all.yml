@@ -9,7 +9,7 @@ app_port: 8000
 app_db_name: transport_firm
 app_db_user: transport
 app_db_password: "{{ vault_db_password }}"
-app_db_host: "{{ hostvars[groups['db'][0]]['private_ip'] }}"
+app_db_host: "{{ hostvars[groups['database'][0]]['private_ip'] }}"
 
 # Here and not in lb.yml: deploy.yml renders the upstream while running on an
 # app host, and delegate_to keeps the vars of the delegating host.
