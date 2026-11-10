@@ -1,0 +1,34 @@
+---
+- name: Create admin group
+  ansible.builtin.group:
+    name: "{{ common_admin_group }}"
+    state: present
+
+- name: Create admin users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    groups: "{{ common_admin_group }}"
+    append: true
+    shell: /bin/bash
+    create_home: true
+  loop: "{{ common_admin_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install authorized SSH keys (exclusive, unlisted keys are removed)
+  ansible.posix.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_keys | join('\n') }}"
+    exclusive: true
+  loop: "{{ common_admin_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Allow the admin group to use sudo
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: /etc/sudoers.d/{{ common_admin_group }}
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s

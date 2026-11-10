@@ -1,0 +1,31 @@
+---
+# Rocky only generates host keys when sshd first starts; `sshd -t` below needs them.
+- name: Generate missing SSH host keys
+  ansible.builtin.command: ssh-keygen -A
+  args:
+    creates: /etc/ssh/ssh_host_ed25519_key
+
+- name: Make sure sshd_config reads the drop-in directory first
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^Include /etc/ssh/sshd_config\.d/\*\.conf'
+    line: Include /etc/ssh/sshd_config.d/*.conf
+    insertbefore: BOF
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Harden sshd
+  ansible.builtin.template:
+    src: sshd-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Enable and start sshd
+  ansible.builtin.systemd_service:
+    name: "{{ common_sshd_service }}"
+    state: started
+    enabled: true

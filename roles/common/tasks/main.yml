@@ -1,0 +1,16 @@
+---
+- name: Load distro-specific variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Admin users and sudo
+  ansible.builtin.import_tasks: users.yml
+
+- name: SSH daemon
+  ansible.builtin.import_tasks: sshd.yml
+
+- name: Automatic security updates
+  ansible.builtin.import_tasks: updates.yml
+  when: common_auto_updates
