@@ -1,0 +1,49 @@
+---
+- name: Install Alertmanager {{ monitoring_alertmanager_version }}
+  ansible.builtin.include_role:
+    name: upstream_binary
+  vars:
+    upstream_binary_name: alertmanager
+    upstream_binary_github: prometheus/alertmanager
+    upstream_binary_version: "{{ monitoring_alertmanager_version }}"
+    upstream_binary_file: alertmanager-{{ monitoring_alertmanager_version }}.linux-amd64.tar.gz
+    upstream_binary_sha256: "{{ monitoring_alertmanager_sha256 }}"
+    upstream_binary_links: [amtool]
+
+- name: Create the Alertmanager directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: alertmanager
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/alertmanager, owner: root, mode: "0750" }
+    - { path: /var/lib/alertmanager, owner: alertmanager, mode: "0750" }
+
+- name: Write alertmanager.yml
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: /etc/alertmanager/alertmanager.yml
+    owner: root
+    group: alertmanager
+    mode: "0640"
+    validate: /opt/alertmanager-{{ monitoring_alertmanager_version }}/amtool check-config %s
+  diff: false  # may contain the Telegram bot token
+  notify: Reload alertmanager
+
+- name: Install the Alertmanager unit
+  ansible.builtin.template:
+    src: alertmanager.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart alertmanager
+
+- name: Enable and start Alertmanager
+  ansible.builtin.systemd_service:
+    name: alertmanager
+    state: started
+    enabled: true
+    daemon_reload: true

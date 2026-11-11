@@ -1,0 +1,59 @@
+# {{ ansible_managed }}
+global:
+  scrape_interval: {{ monitoring_scrape_interval }}
+  evaluation_interval: {{ monitoring_scrape_interval }}
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["{{ monitoring_listen_address }}:{{ monitoring_alertmanager_port }}"]
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["{{ monitoring_listen_address }}:{{ monitoring_prometheus_port }}"]
+        labels: { instance: {{ inventory_hostname }} }
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["{{ monitoring_listen_address }}:{{ monitoring_alertmanager_port }}"]
+        labels: { instance: {{ inventory_hostname }} }
+
+  - job_name: blackbox
+    static_configs:
+      - targets: ["{{ monitoring_listen_address }}:{{ monitoring_blackbox_port }}"]
+        labels: { instance: {{ inventory_hostname }} }
+{% for target in monitoring_targets %}
+
+  # from the inventory: {{ target.hosts | join(', ') }}
+  - job_name: {{ target.job }}
+    static_configs:
+{% for host in target.hosts %}
+      - targets: ["{{ hostvars[host]['private_ip'] }}:{{ target.port }}"]
+        labels: { instance: {{ host }} }
+{% endfor %}
+{% endfor %}
+{% if monitoring_probe_urls %}
+
+  # Black-box checks: Prometheus asks blackbox_exporter to fetch each URL
+  # (?target=<url>) and records probe_success and timings for it.
+  - job_name: http_probe
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+{% for url in monitoring_probe_urls %}
+          - {{ url }}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: {{ monitoring_listen_address }}:{{ monitoring_blackbox_port }}
+{% endif %}

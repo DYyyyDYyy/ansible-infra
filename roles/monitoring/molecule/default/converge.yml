@@ -1,0 +1,20 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    monitoring_scrape_interval: 5s
+    monitoring_alert_for: 0s
+    monitoring_targets:
+      - { job: node, port: 9100, hosts: [self] }
+    monitoring_probe_urls:
+      - http://127.0.0.1:9090/-/healthy   # answers 200
+      - http://127.0.0.1:9/nothing-here  # nothing listens: must alert
+  pre_tasks:
+    # stand-in for an inventory host; the template reads hostvars[...].private_ip
+    - name: Register the scrape target
+      ansible.builtin.add_host:
+        name: self
+        private_ip: 127.0.0.1
+      changed_when: false
+  roles:
+    - role: monitoring

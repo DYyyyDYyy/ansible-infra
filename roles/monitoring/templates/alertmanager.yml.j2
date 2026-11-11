@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+route:
+  receiver: {{ 'telegram' if monitoring_telegram_bot_token else 'none' }}
+  group_by: [alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  # No integrations: alerts are kept and visible in the UI/API, not sent.
+  - name: none
+{% if monitoring_telegram_bot_token %}
+  - name: telegram
+    telegram_configs:
+      - bot_token: "{{ monitoring_telegram_bot_token }}"
+        chat_id: {{ monitoring_telegram_chat_id | int }}
+        send_resolved: true
+{% endif %}
+
+inhibit_rules:
+  # If a whole host is down, do not also page for every check on it.
+  - source_matchers: [alertname = InstanceDown, job = node]
+    target_matchers: [severity =~ "warning|critical", alertname != InstanceDown]
+    equal: [instance]

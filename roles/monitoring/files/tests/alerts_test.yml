@@ -1,0 +1,112 @@
+---
+# promtool test rules alerts_test.yml
+# Synthetic series in, expected alerts out. Every eval_time is at least 10m
+# after the condition starts, so the tests hold for any `for:` up to 10m.
+rule_files:
+  - ../rules/alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: a target that stops answering fires InstanceDown, a healthy one does not
+    interval: 1m
+    input_series:
+      - series: up{job="node", instance="app1"}
+        values: 1 1 0x20
+      - series: up{job="node", instance="app2"}
+        values: 1x22
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: InstanceDown
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: InstanceDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: node, instance: app1 }
+            exp_annotations:
+              summary: node on app1 is not answering scrapes
+
+  - name: a failing HTTP probe fires AppEndpointDown
+    interval: 1m
+    input_series:
+      - series: probe_success{job="http_probe", instance="http://lb/health"}
+        values: 1 0x20
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: AppEndpointDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: http_probe, instance: "http://lb/health" }
+            exp_annotations:
+              summary: http://lb/health is failing its HTTP check
+
+  - name: PostgresDown only when the exporter says so
+    interval: 1m
+    input_series:
+      - series: pg_up{job="postgres", instance="db"}
+        values: 1 1 0x20
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PostgresDown
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: PostgresDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: postgres, instance: db }
+            exp_annotations:
+              summary: postgres_exporter on db cannot reach PostgreSQL
+
+  - name: a nearly full writable disk fires, a read-only one does not
+    interval: 1m
+    input_series:
+      - series: node_filesystem_avail_bytes{instance="db", mountpoint="/", fstype="ext4"}
+        values: 5x20
+      - series: node_filesystem_size_bytes{instance="db", mountpoint="/", fstype="ext4"}
+        values: 100x20
+      - series: node_filesystem_readonly{instance="db", mountpoint="/", fstype="ext4"}
+        values: 0x20
+      - series: node_filesystem_avail_bytes{instance="db", mountpoint="/iso", fstype="iso9660"}
+        values: 0x20
+      - series: node_filesystem_size_bytes{instance="db", mountpoint="/iso", fstype="iso9660"}
+        values: 100x20
+      - series: node_filesystem_readonly{instance="db", mountpoint="/iso", fstype="iso9660"}
+        values: 1x20
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HostDiskAlmostFull
+        exp_alerts:
+          - exp_labels: { severity: warning, instance: db, mountpoint: /, fstype: ext4 }
+            exp_annotations:
+              summary: / on db has less than 10% free
+
+  # promtool starts the clock at 0, so time() at 3h is 10800 s.
+  - name: a backup older than two hours fires BackupTooOld, a fresh one does not
+    interval: 1m
+    input_series:
+      - series: backup_last_success_timestamp_seconds{job="node", instance="db"}
+        values: 0x200
+    alert_rule_test:
+      - eval_time: 1h
+        alertname: BackupTooOld
+        exp_alerts: []
+      - eval_time: 3h
+        alertname: BackupTooOld
+        exp_alerts:
+          - exp_labels: { severity: critical, job: node, instance: db }
+            exp_annotations:
+              summary: last successful backup on db was 3h 0m 0s ago
+
+  - name: no backup metric at all fires BackupMissing
+    interval: 1m
+    input_series:
+      - series: up{job="node", instance="db"}
+        values: 1x20
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: BackupMissing
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: no host reports a successful database backup
+      - eval_time: 15m
+        alertname: BackupTooOld
+        exp_alerts: []

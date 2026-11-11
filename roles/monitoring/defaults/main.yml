@@ -1,0 +1,37 @@
+---
+# Prometheus, Alertmanager and blackbox_exporter on the monitoring host.
+# Pinned upstream releases with their SHA256, same on both distros.
+monitoring_prometheus_version: 3.15.1
+monitoring_prometheus_sha256: 6a726885328ad9efebbf36e876ce2fb6225468a71fd1e7ce3ba666d5f4d97a84
+monitoring_alertmanager_version: 0.34.2
+monitoring_alertmanager_sha256: 17ee14acd0f6ba6e25a436ff223d9c17ddd5cf484f543ad12f0932eaa89ba186
+monitoring_blackbox_version: 0.29.1
+monitoring_blackbox_sha256: b82b81839e6317e84fdd367f46d7ddd3b773fa09cbe2e3d5633a59171d741e76
+
+# All three UIs/APIs listen on localhost only; reach them with an SSH tunnel.
+monitoring_listen_address: 127.0.0.1
+monitoring_prometheus_port: 9090
+monitoring_alertmanager_port: 9093
+monitoring_blackbox_port: 9115
+
+monitoring_scrape_interval: 15s
+monitoring_retention: 15d
+
+# Scrape targets, one job per entry. hosts are inventory hostnames; each is
+# scraped at its private_ip and labelled instance=<hostname>.
+#   - { job: node, port: 9100, hosts: "{{ groups['all'] }}" }
+monitoring_targets: []
+
+# URLs probed by blackbox_exporter (HTTP 2xx expected).
+monitoring_probe_urls: []
+
+# How long a condition must hold before an alert fires. Short in the labs
+# so the alert test finishes quickly. The rule unit tests assume <= 10m.
+monitoring_alert_for: 5m
+monitoring_backup_max_age: 7200      # seconds; the backup runs hourly
+monitoring_disk_free_min_ratio: 0.10
+
+# Telegram receiver; empty token = alerts go to a "null" receiver (still
+# visible in the Alertmanager UI and API, just not sent anywhere).
+monitoring_telegram_bot_token: ""
+monitoring_telegram_chat_id: ""

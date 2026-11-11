@@ -1,0 +1,40 @@
+---
+- name: Check variables
+  ansible.builtin.assert:
+    that:
+      - monitoring_telegram_bot_token | length == 0 or monitoring_telegram_chat_id | string | length > 0
+    fail_msg: monitoring_telegram_chat_id is required when a bot token is set
+    quiet: true
+
+- name: Service accounts
+  ansible.builtin.user:
+    name: "{{ item }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: /nonexistent
+    create_home: false
+  loop: [prometheus, alertmanager, blackbox_exporter]
+
+- name: Blackbox exporter
+  ansible.builtin.import_tasks: blackbox.yml
+
+- name: Alertmanager
+  ansible.builtin.import_tasks: alertmanager.yml
+
+- name: Prometheus
+  ansible.builtin.import_tasks: prometheus.yml
+
+- name: Apply pending restarts and reloads
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait until Prometheus and Alertmanager are ready
+  ansible.builtin.uri:
+    url: http://{{ monitoring_listen_address }}:{{ item }}/-/ready
+  loop:
+    - "{{ monitoring_prometheus_port }}"
+    - "{{ monitoring_alertmanager_port }}"
+  register: monitoring_ready
+  until: monitoring_ready.status == 200
+  retries: 20
+  delay: 1
+  changed_when: false

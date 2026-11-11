@@ -1,0 +1,77 @@
+---
+- name: Install Prometheus {{ monitoring_prometheus_version }}
+  ansible.builtin.include_role:
+    name: upstream_binary
+  vars:
+    upstream_binary_name: prometheus
+    upstream_binary_github: prometheus/prometheus
+    upstream_binary_version: "{{ monitoring_prometheus_version }}"
+    upstream_binary_file: prometheus-{{ monitoring_prometheus_version }}.linux-amd64.tar.gz
+    upstream_binary_sha256: "{{ monitoring_prometheus_sha256 }}"
+    upstream_binary_links: [promtool]
+
+- name: Create the Prometheus directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: prometheus
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/prometheus, owner: root, mode: "0755" }
+    - { path: /etc/prometheus/rules, owner: root, mode: "0755" }
+    - { path: /etc/prometheus/tests, owner: root, mode: "0755" }
+    - { path: /var/lib/prometheus, owner: prometheus, mode: "0750" }
+
+# Rules are written (and checked) before the config that loads them.
+- name: Write the alert rules
+  ansible.builtin.template:
+    src: rules/alerts.yml.j2
+    dest: /etc/prometheus/rules/alerts.yml
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /opt/prometheus-{{ monitoring_prometheus_version }}/promtool check rules %s
+  notify: Reload prometheus
+
+- name: Copy the rule unit tests
+  ansible.builtin.copy:
+    src: tests/alerts_test.yml
+    dest: /etc/prometheus/tests/alerts_test.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+# Feeds synthetic series to the rules and checks which alerts fire when.
+# A rule change that breaks an alert fails here, before Prometheus reloads.
+- name: Unit-test the alert rules
+  ansible.builtin.command: /opt/prometheus-{{ monitoring_prometheus_version }}/promtool test rules alerts_test.yml
+  args:
+    chdir: /etc/prometheus/tests
+  changed_when: false
+
+- name: Write prometheus.yml
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /opt/prometheus-{{ monitoring_prometheus_version }}/promtool check config %s
+  notify: Reload prometheus
+
+- name: Install the Prometheus unit
+  ansible.builtin.template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart prometheus
+
+- name: Enable and start Prometheus
+  ansible.builtin.systemd_service:
+    name: prometheus
+    state: started
+    enabled: true
+    daemon_reload: true

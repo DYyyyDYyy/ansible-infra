@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Prometheus blackbox_exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=blackbox_exporter
+Group=blackbox_exporter
+ExecStart=/opt/blackbox_exporter-{{ monitoring_blackbox_version }}/blackbox_exporter \
+    --config.file=/etc/blackbox_exporter/blackbox.yml \
+    --web.listen-address={{ monitoring_listen_address }}:{{ monitoring_blackbox_port }}
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+
+{% include 'sandbox.j2' +%}
+
+[Install]
+WantedBy=multi-user.target

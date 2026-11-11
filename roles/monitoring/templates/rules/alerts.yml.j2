@@ -1,0 +1,61 @@
+# {{ ansible_managed }}
+# Unit tests: roles/monitoring/files/tests/alerts_test.yml (promtool test rules).
+groups:
+  - name: availability
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: {{ monitoring_alert_for }}
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}{{ $labels.job }} on {{ $labels.instance }} is not answering scrapes{% endraw %}"
+
+      - alert: AppEndpointDown
+        expr: probe_success == 0
+        for: {{ monitoring_alert_for }}
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}{{ $labels.instance }} is failing its HTTP check{% endraw %}"
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: {{ monitoring_alert_for }}
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}postgres_exporter on {{ $labels.instance }} cannot reach PostgreSQL{% endraw %}"
+
+  - name: resources
+    rules:
+      - alert: HostDiskAlmostFull
+        expr: >-
+          node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs"}
+          / node_filesystem_size_bytes < {{ monitoring_disk_free_min_ratio }}
+          and node_filesystem_readonly == 0
+        for: {{ monitoring_alert_for }}
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}{{ $labels.mountpoint }} on {{ $labels.instance }} has less than {% endraw %}{{ (monitoring_disk_free_min_ratio * 100) | int }}{% raw %}% free{% endraw %}"
+
+  - name: backups
+    rules:
+      - alert: BackupTooOld
+        expr: time() - backup_last_success_timestamp_seconds > {{ monitoring_backup_max_age }}
+        for: {{ monitoring_alert_for }}
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}last successful backup on {{ $labels.instance }} was {{ $value | humanizeDuration }} ago{% endraw %}"
+
+      # BackupTooOld cannot fire for a backup that never succeeded (or whose
+      # metric vanished): there is no series to compare. absent() covers it.
+      - alert: BackupMissing
+        expr: absent(backup_last_success_timestamp_seconds)
+        for: {{ monitoring_alert_for }}
+        labels:
+          severity: critical
+        annotations:
+          summary: no host reports a successful database backup
