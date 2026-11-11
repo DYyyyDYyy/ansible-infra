@@ -27,16 +27,10 @@ def test_sudoers_dropin_is_valid(host):
 def test_admin_can_sudo_without_password(host):
     # -n: fail instead of prompting for a password
     result = host.run("sudo -u alice sudo -n true")
-    account = host.run(
-        "chage -l alice; getent shadow alice | cut -d: -f2-; "
-        "journalctl --no-pager -n 15 _COMM=sudo; rpm -q pam sudo shadow-utils 2>/dev/null; "
-        "ls -l /etc/shadow /usr/bin/sudo /usr/sbin/unix_chkpwd; getcap /usr/sbin/unix_chkpwd; "
-        "grep -E '^(passwd|shadow):' /etc/nsswitch.conf; grep -E '^account' /etc/pam.d/system-auth; "
-        "sudo -u alice grep -E '^Cap(Prm|Eff|Bnd)' /proc/self/status; grep -E '^(Cap|NoNewPrivs|Seccomp)' /proc/1/status; "
-        "dnf -q -y install strace >/dev/null 2>&1; strace -f -qq -o /tmp/sudo.trace sudo -u alice sudo -n true; "
-        "grep -E 'shadow|chkpwd|passwd|EACCES|EPERM|ENOENT.*nss' /tmp/sudo.trace | grep -v 'locale' | tail -25"
-    ).stdout
-    assert result.rc == 0, f"{result.stderr}\n{account}"
+    # On failure, show why: PAM logs the real reason, sudo only says "a
+    # password is required" (see the AppArmor note in .github/workflows/ci.yml).
+    pam_log = host.run("journalctl --no-pager -n 10 _COMM=sudo _COMM=unix_chkpwd").stdout
+    assert result.rc == 0, f"{result.stderr}\n{pam_log}"
 
 
 def test_sshd_effective_config(host):

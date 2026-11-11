@@ -52,8 +52,28 @@ jobs:
           enable-cache: true
           cache-dependency-glob: requirements-dev.txt
       - run: make venv
+
+      # Ubuntu 24.04 confines /usr/sbin/unix_chkpwd with an AppArmor profile
+      # written for Debian, where /etc/shadow is 0640 root:shadow and the
+      # helper is setgid shadow: it grants no capabilities beyond audit_write.
+      # AppArmor attaches profiles by path, so it also confines the helper
+      # inside the Rocky containers, where /etc/shadow is mode 0000 and is
+      # read with CAP_DAC_OVERRIDE. pam_unix then fails ("Authentication
+      # service cannot retrieve authentication info") and sudo asks for a
+      # password. Real Rocky hosts have no such profile (SELinux instead).
+      - name: Unload the host's unix-chkpwd AppArmor profile (Rocky containers)
+        if: matrix.platform == 'rocky10'
+        run: |
+          if [ -f /etc/apparmor.d/unix-chkpwd ]; then
+            sudo apparmor_parser -R /etc/apparmor.d/unix-chkpwd
+          fi
+
       # converge, idempotence (second run must report changed=0), testinfra
       - run: make test ROLE=${{ matrix.role }} PLATFORM=${{ matrix.platform }}
+
+      - name: Show AppArmor denials
+        if: failure()
+        run: sudo dmesg | grep 'apparmor="DENIED"' | tail -20 || true
 
   e2e:
     name: e2e (docker lab)
