@@ -1,0 +1,29 @@
+---
+# Install a release tarball from upstream (GitHub releases), pinned by
+# version and SHA256. Used by the exporter, Prometheus and rest-server roles:
+#
+#   - ansible.builtin.include_role:
+#       name: upstream_binary
+#     vars:
+#       upstream_binary_name: node_exporter        # executable in the tarball
+#       upstream_binary_github: prometheus/node_exporter
+#       upstream_binary_version: 1.12.1
+#       upstream_binary_file: node_exporter-1.12.1.linux-amd64.tar.gz
+#       upstream_binary_sha256: b51d8a76...         # from the release's sha256sums
+#
+# and it ends up in /opt/node_exporter-1.12.1.
+#
+# The tarball is downloaded once, on the controller, into a cache shared by
+# every host and every run, and verified there before it is copied anywhere.
+upstream_binary_name: ""
+upstream_binary_github: ""
+upstream_binary_version: ""
+upstream_binary_file: ""
+upstream_binary_sha256: ""
+upstream_binary_url: https://github.com/{{ upstream_binary_github }}/releases/download/v{{ upstream_binary_version }}/{{ upstream_binary_file }}
+upstream_binary_dest: /opt/{{ upstream_binary_name }}-{{ upstream_binary_version }}
+# Executables from the tarball to link into /usr/local/bin (CLI tools such
+# as promtool). Services use the versioned path directly, so a version bump
+# changes their unit file and restarts them.
+upstream_binary_links: []
+upstream_binary_cache_dir: "{{ lookup('env', 'XDG_CACHE_HOME') | default(lookup('env', 'HOME') ~ '/.cache', true) }}/ansible-infra/downloads"

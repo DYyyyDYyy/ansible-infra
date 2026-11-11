@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: upstream_binary
+  author: Didukh Sviatoslav
+  description: Install a pinned, checksum-verified upstream release tarball (helper for other roles)
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: Debian
+      versions: [trixie]
+    - name: EL
+      versions: ["10"]
+dependencies: []
