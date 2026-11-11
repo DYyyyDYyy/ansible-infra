@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Hourly PostgreSQL backup
+
+[Timer]
+OnCalendar={{ backup_on_calendar }}
+# Spread the load if many hosts back up to the same server.
+RandomizedDelaySec={{ backup_randomized_delay }}
+# Catch up on a run missed while the host was off.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

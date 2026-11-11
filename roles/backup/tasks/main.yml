@@ -1,0 +1,100 @@
+---
+- name: Check variables
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'Debian'
+      - "backup_repository is match('rest:https?://')"
+      - backup_rest_user | length > 0
+      - backup_rest_password | length > 0
+      - backup_restic_password | length > 0
+      - backup_databases | length > 0
+    fail_msg: "backup needs Debian, a rest: repository, its credentials and at least one database"
+    quiet: true
+
+- name: Install restic
+  ansible.builtin.apt:
+    name: restic
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# A dedicated account with read-only access to the data. It authenticates
+# over the Unix socket with peer auth (OS user = database role), so no
+# database password is stored for it.
+- name: Create the service account
+  ansible.builtin.user:
+    name: backup_pg
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/cache/backup
+    create_home: false
+
+- name: Create the database role
+  community.postgresql.postgresql_user:
+    name: backup_pg
+    role_attr_flags: LOGIN
+  become: true
+  become_user: postgres
+
+# pg_read_all_data (PostgreSQL 14+): SELECT on every table and sequence,
+# enough for pg_dump, no write access and no superuser.
+- name: Grant read access to all data
+  community.postgresql.postgresql_membership:
+    groups: [pg_read_all_data]
+    target_roles: [backup_pg]
+  become: true
+  become_user: postgres
+
+- name: Create the config directory
+  ansible.builtin.file:
+    path: /etc/restic
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# Read by systemd (as root) before the job drops to backup_pg; the account
+# itself cannot read the file.
+- name: Write the repository credentials
+  ansible.builtin.template:
+    src: backup.env.j2
+    dest: /etc/restic/backup.env
+    owner: root
+    group: root
+    mode: "0600"
+  diff: false  # contains passwords
+
+- name: Install the backup scripts
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /usr/local/sbin/{{ item }}
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - pg-backup
+    - backup-mark-success
+
+- name: Install the service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - backup.service
+    - backup.timer
+  notify: Reload systemd
+
+- name: Load the new units
+  ansible.builtin.meta: flush_handlers
+
+- name: Repository
+  ansible.builtin.import_tasks: repository.yml
+
+- name: Enable the timer
+  ansible.builtin.systemd_service:
+    name: backup.timer
+    state: started
+    enabled: true

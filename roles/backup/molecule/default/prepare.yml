@@ -1,0 +1,32 @@
+---
+# Everything the backup role expects around it, on one container: a
+# PostgreSQL with some data, a rest-server to back up to, and the
+# node_exporter textfile directory.
+- name: Prepare
+  hosts: all
+  vars:
+    postgresql_users:
+      - { name: transport, password: molecule-secret }
+    postgresql_databases:
+      - { name: transport_firm, owner: transport }
+    restic_server_users:
+      - { name: db, password: http-secret }
+  roles:
+    - role: postgresql
+    - role: restic_server
+  tasks:
+    - name: Create the textfile directory (the node_exporter role does this on real hosts)
+      ansible.builtin.file:
+        path: /var/lib/node_exporter/textfile
+        state: directory
+        mode: "0755"
+
+    - name: Create and fill a table
+      community.postgresql.postgresql_query:
+        login_db: transport_firm
+        query: |
+          CREATE TABLE IF NOT EXISTS clients (id serial PRIMARY KEY, name text NOT NULL);
+          ALTER TABLE clients OWNER TO transport;
+          INSERT INTO clients (name) SELECT 'client ' || n FROM generate_series(1, 25) AS n;
+      become: true
+      become_user: postgres

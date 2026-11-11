@@ -1,0 +1,17 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Dump each database straight into restic, one snapshot per database.
+#
+# --stdin-from-command instead of `pg_dump | restic backup --stdin`: with a
+# pipe, restic cannot tell a complete dump from one cut short by an error
+# and saves both. Here restic runs pg_dump itself and refuses to save the
+# snapshot if it exits non-zero.
+set -euo pipefail
+
+for db in {{ backup_databases | join(' ') }}; do
+    echo "backing up $db"
+    restic backup --quiet \
+        --host {{ inventory_hostname }} --tag postgres --tag "$db" \
+        --stdin-from-command --stdin-filename "$db.dump" \
+        -- pg_dump --format=custom "$db"
+done

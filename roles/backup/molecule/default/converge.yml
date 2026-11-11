@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    backup_repository: rest:http://127.0.0.1:8000/db/
+    backup_rest_user: db
+    backup_rest_password: http-secret
+    backup_restic_password: repo-secret
+    backup_databases: [transport_firm]
+  roles:
+    - role: backup
