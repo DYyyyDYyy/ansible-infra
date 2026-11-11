@@ -32,7 +32,9 @@ def test_admin_can_sudo_without_password(host):
         "journalctl --no-pager -n 15 _COMM=sudo; rpm -q pam sudo shadow-utils 2>/dev/null; "
         "ls -l /etc/shadow /usr/bin/sudo /usr/sbin/unix_chkpwd; getcap /usr/sbin/unix_chkpwd; "
         "grep -E '^(passwd|shadow):' /etc/nsswitch.conf; grep -E '^account' /etc/pam.d/system-auth; "
-        "sudo -u alice grep -E '^Cap(Prm|Eff|Bnd)' /proc/self/status; grep -E '^(Cap|NoNewPrivs|Seccomp)' /proc/1/status"
+        "sudo -u alice grep -E '^Cap(Prm|Eff|Bnd)' /proc/self/status; grep -E '^(Cap|NoNewPrivs|Seccomp)' /proc/1/status; "
+        "dnf -q -y install strace >/dev/null 2>&1; strace -f -qq -o /tmp/sudo.trace sudo -u alice sudo -n true; "
+        "grep -E 'shadow|chkpwd|passwd|EACCES|EPERM|ENOENT.*nss' /tmp/sudo.trace | grep -v 'locale' | tail -25"
     ).stdout
     assert result.rc == 0, f"{result.stderr}\n{account}"
 
