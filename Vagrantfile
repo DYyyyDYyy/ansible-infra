@@ -1,5 +1,5 @@
 # -*- mode: ruby -*-
-# Four empty VMs on libvirt/KVM. Vagrant only creates them and brings up the
+# Five empty VMs on libvirt/KVM. Vagrant only creates them and brings up the
 # private network; everything else is done by Ansible from this machine
 # (`make up` = `vagrant up` + playbooks/site.yml against inventories/vagrant).
 #
@@ -46,6 +46,8 @@ NODES = [
   { name: "app1", box: :debian, ip: "10.10.10.11", memory: 1024 },
   { name: "app2", box: :rocky,  ip: "10.10.10.12", memory: 1024 },
   { name: "db",   box: :debian, ip: "10.10.10.13", memory: 1024 },
+  # backups (rest-server) and monitoring (Prometheus, Alertmanager)
+  { name: "ops",  box: :debian, ip: "10.10.10.14", memory: 1024 },
 ].freeze
 
 Vagrant.configure("2") do |config|
