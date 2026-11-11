@@ -27,7 +27,7 @@ APP_OLD := def475af343b98ff25ab5b253d328745f3378a20
 APP_NEW := fd3fea549ecb92ee7ff98fd5638e0ccfcbc4aabc
 
 .PHONY: help venv lint test vault-init up provision deploy check-idempotence \
-	zero-downtime test-rollback restore-test e2e lab-up lab-down down
+	zero-downtime test-rollback restore-test alert-test e2e lab-up lab-down down
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -108,9 +108,13 @@ test-rollback: venv vault-init ## Deploy a release whose smoke test fails, expec
 restore-test: venv vault-init ## Back up now, restore into a scratch database, compare row counts
 	$(PLAYBOOK) playbooks/restore-test.yml
 
-e2e: ## Full CI run on the docker lab: up, idempotence, deploys, restore
+alert-test: venv vault-init ## Stop the API and an exporter, expect the alerts in Alertmanager
+	$(PLAYBOOK) playbooks/alert-test.yml
+
+e2e: ## Full CI run on the docker lab: up, idempotence, deploys, restore, alerts
 	$(MAKE) up ENV=docker
 	$(MAKE) check-idempotence ENV=docker
 	$(MAKE) zero-downtime ENV=docker
 	$(MAKE) test-rollback ENV=docker
 	$(MAKE) restore-test ENV=docker
+	$(MAKE) alert-test ENV=docker

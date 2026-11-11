@@ -1,0 +1,72 @@
+---
+# Break things on purpose and check that the right alerts fire.
+#
+#   make alert-test
+#
+# Stops the API on every app server (the blackbox probe through nginx must
+# fail: AppEndpointDown) and postgres_exporter on the database host (its
+# scrape must fail: InstanceDown for job=postgres). Then waits for both in
+# Alertmanager's API, starts everything again and waits for the alerts to
+# resolve. Needs a short monitoring_alert_for (30s in the labs).
+
+- name: Break the app and the PostgreSQL exporter
+  hosts: app:database
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Stop the service
+      ansible.builtin.systemd_service:
+        name: "{{ 'transport-api' if inventory_hostname in groups['app'] else 'postgres_exporter' }}"
+        state: stopped
+
+- name: Expect the alerts in Alertmanager
+  hosts: operations
+  become: true
+  gather_facts: false
+  vars:
+    alert_test_expected:
+      - { alertname: AppEndpointDown, job: http_probe }
+      - { alertname: InstanceDown, job: postgres }
+    alert_test_api: http://{{ monitoring_listen_address | default('127.0.0.1') }}:9093/api/v2/alerts
+  tasks:
+    - name: Wait for the alerts, then restore the services
+      block:
+        # Only "active" counts: firing and not silenced or inhibited.
+        - name: Wait for each expected alert to fire
+          ansible.builtin.uri:
+            url: "{{ alert_test_api }}?active=true&filter=alertname%3D%22{{ item.alertname }}%22&filter=job%3D%22{{ item.job }}%22"
+            return_content: true
+          register: alert_test_alerts
+          until: alert_test_alerts.json | default([]) | selectattr('status.state', 'equalto', 'active') | list | length > 0
+          retries: 36
+          delay: 5
+          loop: "{{ alert_test_expected }}"
+          loop_control:
+            label: "{{ item.alertname }} {{ item.job }}"
+
+        - name: Show what fired
+          ansible.builtin.debug:
+            msg: "{{ item.item.alertname }} firing for {{ item.json | map(attribute='labels.instance') | join(', ') }}"
+          loop: "{{ alert_test_alerts.results }}"
+          loop_control:
+            label: "{{ item.item.alertname }}"
+
+      always:
+        - name: Start the services again
+          ansible.builtin.systemd_service:
+            name: "{{ 'transport-api' if item in groups['app'] else 'postgres_exporter' }}"
+            state: started
+          delegate_to: "{{ item }}"
+          loop: "{{ groups['app'] + groups['database'] }}"
+
+    - name: Wait for every alert to resolve
+      ansible.builtin.uri:
+        url: "{{ alert_test_api }}?active=true&filter=alertname%3D%22{{ item.alertname }}%22&filter=job%3D%22{{ item.job }}%22"
+        return_content: true
+      register: alert_test_resolved
+      until: alert_test_resolved.json | default(['pending']) | length == 0
+      retries: 36
+      delay: 5
+      loop: "{{ alert_test_expected }}"
+      loop_control:
+        label: "{{ item.alertname }} {{ item.job }}"
