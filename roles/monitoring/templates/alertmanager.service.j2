@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Prometheus Alertmanager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=alertmanager
+Group=alertmanager
+# --cluster.listen-address= disables the HA gossip port (9094): one instance.
+ExecStart=/opt/alertmanager-{{ monitoring_alertmanager_version }}/alertmanager \
+    --config.file=/etc/alertmanager/alertmanager.yml \
+    --storage.path=/var/lib/alertmanager \
+    --web.listen-address={{ monitoring_listen_address }}:{{ monitoring_alertmanager_port }} \
+    --cluster.listen-address=
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+
+ReadWritePaths=/var/lib/alertmanager
+{% include 'sandbox.j2' +%}
+
+[Install]
+WantedBy=multi-user.target

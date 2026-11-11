@@ -1,0 +1,12 @@
+---
+- name: Prepare
+  hosts: all
+  roles:
+    # a real scrape target on the same container
+    - role: node_exporter
+  tasks:
+    - name: Install curl for the tests
+      ansible.builtin.package:
+        name: curl
+        state: present
+        update_cache: "{{ ansible_facts['os_family'] == 'Debian' }}"

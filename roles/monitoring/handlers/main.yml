@@ -1,0 +1,38 @@
+---
+# Restarts are listed first: handlers run in this order, and when a unit
+# file and a config change together, the restart must come before a reload
+# (a reload of a stopped service fails).
+- name: Restart prometheus
+  ansible.builtin.systemd_service:
+    name: prometheus
+    state: restarted
+    daemon_reload: true
+
+- name: Restart alertmanager
+  ansible.builtin.systemd_service:
+    name: alertmanager
+    state: restarted
+    daemon_reload: true
+
+- name: Restart blackbox_exporter
+  ansible.builtin.systemd_service:
+    name: blackbox_exporter
+    state: restarted
+    daemon_reload: true
+
+# SIGHUP: re-read the config without dropping state. The config was already
+# checked by promtool/amtool before it was written.
+- name: Reload prometheus
+  ansible.builtin.systemd_service:
+    name: prometheus
+    state: reloaded
+
+- name: Reload alertmanager
+  ansible.builtin.systemd_service:
+    name: alertmanager
+    state: reloaded
+
+- name: Reload blackbox_exporter
+  ansible.builtin.systemd_service:
+    name: blackbox_exporter
+    state: reloaded

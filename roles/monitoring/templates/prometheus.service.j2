@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Prometheus
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=prometheus
+Group=prometheus
+ExecStart=/opt/prometheus-{{ monitoring_prometheus_version }}/prometheus \
+    --config.file=/etc/prometheus/prometheus.yml \
+    --storage.tsdb.path=/var/lib/prometheus \
+    --storage.tsdb.retention.time={{ monitoring_retention }} \
+    --web.listen-address={{ monitoring_listen_address }}:{{ monitoring_prometheus_port }}
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=60
+
+ReadWritePaths=/var/lib/prometheus
+{% include 'sandbox.j2' +%}
+
+[Install]
+WantedBy=multi-user.target
