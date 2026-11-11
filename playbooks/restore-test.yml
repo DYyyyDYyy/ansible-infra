@@ -1,0 +1,145 @@
+---
+# Prove that the backups can be restored, not only that they exist.
+#
+#   make restore-test
+#
+# 1. put data in through the real stack (seed script + a POST via nginx);
+# 2. run the backup job now and wait for it;
+# 3. restore the latest snapshot into a scratch database;
+# 4. compare count(*) of every table with the live database;
+# 5. drop the scratch database, whatever happened.
+
+- name: Put data into the database
+  hosts: app[0]
+  become: true
+  gather_facts: false
+  vars:
+    restore_run_id: "{{ now(utc=true, fmt='%s') }}"
+  tasks:
+    # The app's own seed script, from the deployed release. It inserts rows
+    # into every table and does nothing if the data is already there.
+    - name: Run the seed script of the current release
+      ansible.builtin.shell: |
+        set -a
+        . /etc/transport-api.env
+        exec .venv/bin/python -m scripts.seed
+      args:
+        chdir: /opt/transport-api/current
+      become: true
+      become_user: transport
+      register: restore_seed
+      changed_when: "'skipping' not in restore_seed.stdout"
+
+    # A row the seed script cannot have made: it is only in the restore if
+    # the snapshot was taken after this run started.
+    - name: Create a client through the load balancer
+      ansible.builtin.uri:
+        url: "{{ lab_public_url }}/clients"
+        method: POST
+        body_format: json
+        # email is unique in the schema, so make every run's client different
+        body:
+          name: restore-test {{ restore_run_id }}
+          phone: "+380{{ restore_run_id }}"
+          email: restore-test-{{ restore_run_id }}@example.com
+        status_code: 201
+      delegate_to: localhost
+      become: false
+
+- name: Back up, restore and compare
+  hosts: database
+  become: true
+  gather_facts: false
+  vars:
+    restore_db: "{{ app_db_name }}_restore_test"
+  tasks:
+    # backup.service is Type=oneshot: starting it returns when the backup is
+    # done, and fails if the backup fails. It is inactive again afterwards,
+    # so this starts a new run every time.
+    - name: Run the backup now
+      ansible.builtin.systemd_service:
+        name: backup.service
+        state: started
+
+    - name: List the tables of the live database
+      community.postgresql.postgresql_query:
+        login_db: "{{ app_db_name }}"
+        query: SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
+      become: true
+      become_user: postgres
+      register: restore_tables
+
+    # SELECT 'clients' AS tablename, count(*) AS row_count FROM "clients" UNION ALL ...
+    - name: Build one query that counts every table
+      ansible.builtin.set_fact:
+        restore_count_query: >-
+          {% for table in restore_tables.query_result | map(attribute='tablename') -%}
+          SELECT '{{ table }}' AS tablename, count(*) AS row_count FROM "{{ table }}"
+          {{- ' UNION ALL ' if not loop.last }}
+          {%- endfor %} ORDER BY tablename
+
+    - name: Restore into a scratch database and compare
+      block:
+        - name: Drop a scratch database left by an interrupted run
+          community.postgresql.postgresql_db:
+            name: "{{ restore_db }}"
+            state: absent
+          become: true
+          become_user: postgres
+
+        - name: Create the scratch database
+          community.postgresql.postgresql_db:
+            name: "{{ restore_db }}"
+          become: true
+          become_user: postgres
+
+        # Same credentials as the backup job. restic runs as root; pg_restore
+        # runs as postgres (peer auth). pipefail: a failed dump must fail here.
+        - name: Restore the latest snapshot of {{ app_db_name }}
+          ansible.builtin.shell: |
+            set -euo pipefail
+            set -a
+            . /etc/restic/backup.env
+            set +a
+            restic --no-cache dump --host {{ inventory_hostname }} --tag {{ app_db_name }} latest /{{ app_db_name }}.dump |
+              runuser -u postgres -- pg_restore --no-owner --no-acl --exit-on-error -d {{ restore_db }}
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Count the rows in both databases
+          community.postgresql.postgresql_query:
+            login_db: "{{ item }}"
+            query: "{{ restore_count_query }}"
+          become: true
+          become_user: postgres
+          loop:
+            - "{{ app_db_name }}"
+            - "{{ restore_db }}"
+          register: restore_counts
+
+        - name: Show the counts
+          ansible.builtin.debug:
+            msg: "{{ item.tablename }}: {{ item.row_count }}"
+          loop: "{{ restore_counts.results[0].query_result }}"
+          loop_control:
+            label: "{{ item.tablename }}"
+
+        - name: Compare
+          ansible.builtin.assert:
+            that:
+              - restore_counts.results[0].query_result == restore_counts.results[1].query_result
+              - restore_counts.results[0].query_result | map(attribute='row_count') | sum > 0
+            fail_msg: "restored row counts differ from the live database: {{ restore_counts.results[1].query_result }}"
+            success_msg: >-
+              OK: {{ restore_counts.results[1].query_result | length }} tables,
+              {{ restore_counts.results[1].query_result | map(attribute='row_count') | sum }} rows,
+              identical to the live database
+
+      always:
+        - name: Drop the scratch database
+          community.postgresql.postgresql_db:
+            name: "{{ restore_db }}"
+            state: absent
+          become: true
+          become_user: postgres
