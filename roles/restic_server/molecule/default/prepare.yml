@@ -1,0 +1,8 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install curl for the tests
+      ansible.builtin.apt:
+        name: curl
+        update_cache: true

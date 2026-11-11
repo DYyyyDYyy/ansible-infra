@@ -1,0 +1,45 @@
+# {{ ansible_managed }}
+[Unit]
+Description=restic REST server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=restic
+Group=restic
+ExecStart=/opt/rest-server-{{ restic_server_version }}/rest-server \
+    --path {{ restic_server_data_dir }} \
+    --listen {{ restic_server_listen_address }}:{{ restic_server_port }} \
+    --private-repos{{ ' --append-only' if restic_server_append_only else '' }}
+Restart=on-failure
+RestartSec=2
+
+# --- Sandboxing ---
+# The only writable path is the repository directory.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths={{ restic_server_data_dir }}
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

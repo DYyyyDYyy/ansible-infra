@@ -1,0 +1,46 @@
+---
+- name: Create the maintenance config directory
+  ansible.builtin.file:
+    path: /etc/restic-server
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# One env file per repository, read by systemd (as root) before it starts
+# the maintenance job as the restic user.
+- name: Write the repository passwords
+  ansible.builtin.template:
+    src: maintenance.env.j2
+    dest: /etc/restic-server/{{ item.name }}.env
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ restic_server_maintained_repos }}"
+  loop_control:
+    label: "{{ item.name }}"
+  diff: false  # contains the repository password
+
+- name: Install the maintenance service and timer templates
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - restic-maintenance@.service
+    - restic-maintenance@.timer
+  notify: Reload systemd
+
+- name: Load the new units
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable a maintenance timer per repository
+  ansible.builtin.systemd_service:
+    name: restic-maintenance@{{ item.name }}.timer
+    state: started
+    enabled: true
+  loop: "{{ restic_server_maintained_repos }}"
+  loop_control:
+    label: "{{ item.name }}"

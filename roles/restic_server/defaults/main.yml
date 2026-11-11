@@ -1,0 +1,29 @@
+---
+# restic's own HTTP server (https://github.com/restic/rest-server), pinned
+# upstream release. The backup clients talk to it over HTTP; restic encrypts
+# everything client-side, so the server never sees plaintext.
+restic_server_version: 0.14.0
+restic_server_sha256: 4c9c95bc079a0334e81fad379b19dc5c3353c71c2c88d652cafce2081c2b1c66
+
+restic_server_listen_address: 127.0.0.1
+restic_server_port: 8000
+restic_server_data_dir: /var/lib/restic-server
+
+# Append-only: clients can add snapshots but never delete or overwrite
+# anything. A compromised client (or ransomware on it) cannot destroy the
+# backup history. Old snapshots are removed here, on the server, instead.
+restic_server_append_only: true
+
+# HTTP users, stored bcrypt-hashed in .htpasswd. With --private-repos each
+# user can only reach the repository under /<name>/.
+#   - { name: db, password: "{{ vault_backup_password }}" }
+restic_server_users: []
+
+# Server-side retention: forget + prune + check, run locally on the
+# repository directory by a timer. Needs the repository password, which is
+# why it runs on this host and not on the (append-only) clients.
+#   - { name: db, password: "{{ vault_restic_password }}" }
+restic_server_maintained_repos: []
+restic_server_keep_hourly: 24
+restic_server_keep_daily: 7
+restic_server_maintenance_on_calendar: "*-*-* 03:30:00"

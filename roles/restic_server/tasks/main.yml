@@ -1,0 +1,108 @@
+---
+- name: Check that this is a Debian host
+  ansible.builtin.assert:
+    that: ansible_facts['os_family'] == 'Debian'
+    fail_msg: restic_server needs the restic package from the Debian repositories
+    quiet: true
+
+- name: Install restic and htpasswd
+  ansible.builtin.apt:
+    name: [restic, apache2-utils]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install rest-server {{ restic_server_version }}
+  ansible.builtin.include_role:
+    name: upstream_binary
+  vars:
+    upstream_binary_name: rest-server
+    upstream_binary_github: restic/rest-server
+    upstream_binary_version: "{{ restic_server_version }}"
+    upstream_binary_file: rest-server_{{ restic_server_version }}_linux_amd64.tar.gz
+    upstream_binary_sha256: "{{ restic_server_sha256 }}"
+
+- name: Create the service account
+  ansible.builtin.user:
+    name: restic
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ restic_server_data_dir }}"
+    create_home: false
+
+- name: Create the data directory
+  ansible.builtin.file:
+    path: "{{ restic_server_data_dir }}"
+    state: directory
+    owner: restic
+    group: restic
+    mode: "0700"
+
+- name: Create the htpasswd file
+  ansible.builtin.copy:
+    dest: "{{ restic_server_data_dir }}/.htpasswd"
+    content: ""
+    force: false
+    owner: restic
+    group: restic
+    mode: "0600"
+
+# rest-server only accepts bcrypt (or SHA1) hashes. bcrypt has a random salt,
+# so the hash differs on every run: instead of templating the file, check
+# the password with `htpasswd -v` and only rewrite the entry if it fails.
+# Passwords go through stdin (-i), never on the command line.
+- name: Check the HTTP passwords
+  ansible.builtin.command:
+    cmd: htpasswd -v -i {{ restic_server_data_dir }}/.htpasswd {{ item.name }}
+    stdin: "{{ item.password }}"
+  loop: "{{ restic_server_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: restic_server_htpasswd_check
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Set the HTTP passwords that do not match
+  ansible.builtin.command:
+    cmd: htpasswd -B -i {{ restic_server_data_dir }}/.htpasswd {{ item.item.name }}
+    stdin: "{{ item.item.password }}"
+  loop: "{{ restic_server_htpasswd_check.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.rc != 0
+  changed_when: true
+  no_log: true
+
+- name: Install the systemd unit
+  ansible.builtin.template:
+    src: rest-server.service.j2
+    dest: /etc/systemd/system/rest-server.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart rest-server
+
+- name: Enable and start rest-server
+  ansible.builtin.systemd_service:
+    name: rest-server
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Server-side retention
+  ansible.builtin.import_tasks: maintenance.yml
+
+- name: Apply a pending restart
+  ansible.builtin.meta: flush_handlers
+
+# 401 without credentials means it is up and enforcing authentication.
+- name: Wait for rest-server
+  ansible.builtin.uri:
+    url: http://{{ restic_server_listen_address }}:{{ restic_server_port }}/
+    status_code: 401
+  register: restic_server_up
+  until: restic_server_up.status == 401
+  retries: 10
+  delay: 1
+  changed_when: false

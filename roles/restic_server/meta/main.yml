@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: restic_server
+  author: Didukh Sviatoslav
+  description: restic rest-server in append-only mode, with server-side retention (forget, prune, check)
+  license: MIT
+  min_ansible_version: "2.18"
+  # The restic client (needed for server-side pruning) comes from the
+  # Debian repositories; Rocky only has it in EPEL. The backup host is Debian.
+  platforms:
+    - name: Debian
+      versions: [trixie]
+dependencies: []

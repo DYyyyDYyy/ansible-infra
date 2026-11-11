@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    restic_server_users:
+      - { name: db, password: http-secret }
+      - { name: other, password: other-secret }
+    restic_server_maintained_repos:
+      - { name: db, password: repo-secret }
+  roles:
+    - role: restic_server
