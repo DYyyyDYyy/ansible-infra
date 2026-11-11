@@ -36,11 +36,17 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
 # The timex collector reads the clock state with adjtimex(2), which is in
-# @clock (part of @privileged): without this line seccomp kills the process
-# on its first scrape. Read-only use is fine: changing the clock would also
-# need CAP_SYS_TIME, which the empty CapabilityBoundingSet removes. For the
-# same reason ProtectClock is not set (it blocks adjtimex as well).
+# @clock (part of @privileged); without this line the collector cannot work
+# (and before SystemCallErrorNumber below, seccomp killed the process on its
+# first scrape). Read-only use is fine: changing the clock would also need
+# CAP_SYS_TIME, which the empty CapabilityBoundingSet removes. For the same
+# reason ProtectClock is not set (it blocks adjtimex as well).
 SystemCallFilter=adjtimex
+# A call outside the list fails with EPERM instead of killing the process.
+# On the EL10 kernel node_exporter also tries the new mount API (fsopen,
+# fsmount, open_tree), which was fatal on Rocky VMs and is not needed: the
+# collectors fall back. Containers and Debian never made those calls.
+SystemCallErrorNumber=EPERM
 
 [Install]
 WantedBy=multi-user.target
