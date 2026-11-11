@@ -1,0 +1,10 @@
+---
+- name: Prepare
+  hosts: all
+  roles:
+    - role: postgresql
+  tasks:
+    - name: Install curl for the tests
+      ansible.builtin.package:
+        name: curl
+        state: present

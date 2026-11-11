@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: postgres_exporter
+  author: Didukh Sviatoslav
+  description: Prometheus postgres_exporter from a pinned upstream release, peer auth over the Unix socket as a pg_monitor role
+  license: MIT
+  min_ansible_version: "2.18"
+  platforms:
+    - name: Debian
+      versions: [trixie]
+    - name: EL
+      versions: ["10"]
+dependencies: []
