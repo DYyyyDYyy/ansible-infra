@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Daily restic retention for repository %i
+
+[Timer]
+OnCalendar={{ restic_server_maintenance_on_calendar }}
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,36 @@
+# {{ ansible_managed }}
+# Retention for the repository %i. Clients are append-only, so deleting old
+# snapshots can only happen here: forget applies the policy, prune frees the
+# space, check reads the repository structure back.
+[Unit]
+Description=restic retention and check for repository %i
+After=rest-server.service
+
+[Service]
+Type=oneshot
+User=restic
+Group=restic
+EnvironmentFile=/etc/restic-server/%i.env
+Environment=RESTIC_CACHE_DIR=/var/cache/restic-maintenance
+CacheDirectory=restic-maintenance
+ExecStart=/usr/bin/restic forget --prune \
+    --keep-hourly {{ restic_server_keep_hourly }} --keep-daily {{ restic_server_keep_daily }}
+ExecStart=/usr/bin/restic check
+Nice=10
+IOSchedulingClass=idle
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths={{ restic_server_data_dir }}
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
