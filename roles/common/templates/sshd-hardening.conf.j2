@@ -19,7 +19,7 @@ ClientAliveCountMax 2
 
 X11Forwarding no
 AllowAgentForwarding no
-AllowTcpForwarding no
+AllowTcpForwarding {{ common_sshd_allow_tcp_forwarding }}
 PermitTunnel no
 {% if common_sshd_allow_groups %}
 
