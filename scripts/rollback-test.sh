@@ -13,11 +13,15 @@ set -euo pipefail
 lb_url=$1 good=$2 bad=$3
 shift 3
 
+# Ad-hoc ansible whose output is parsed: never coloured. CI sets
+# ANSIBLE_FORCE_COLOR=1, which left "\e[0m" glued to the release name.
+plain_ansible() { ANSIBLE_FORCE_COLOR=0 ANSIBLE_NOCOLOR=1 ansible "$@"; }
+
 # Prints the release directory name that /opt/transport-api/current points to.
 current_release() {
     local host=$1
     shift
-    ansible "$host" "$@" -m ansible.builtin.command -a 'readlink /opt/transport-api/current' 2>/dev/null |
+    plain_ansible "$host" "$@" -m ansible.builtin.command -a 'readlink /opt/transport-api/current' 2>/dev/null |
         tail -n 1 | xargs basename
 }
 
@@ -36,7 +40,7 @@ for host in app1 app2; do
     [[ $release == "$good" ]] || { echo "FAIL: $host should be on $good" >&2; exit 1; }
 done
 
-upstream=$(ansible lb "${inv[@]}" -b -m ansible.builtin.command -a 'cat /etc/nginx/conf.d/upstream.conf' 2>/dev/null)
+upstream=$(plain_ansible lb "${inv[@]}" -b -m ansible.builtin.command -a 'cat /etc/nginx/conf.d/upstream.conf' 2>/dev/null)
 if grep -q ' down;' <<<"$upstream"; then
     echo "FAIL: a host is still drained in nginx:" >&2
     echo "$upstream" >&2
