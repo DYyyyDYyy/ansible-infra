@@ -38,8 +38,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        role: [common, firewall, postgresql, app, nginx]
+        role: [common, firewall, postgresql, app, nginx, node_exporter, postgres_exporter, restic_server, backup, monitoring]
         platform: [debian13, rocky10]
+        # These two need restic from the Debian repositories (Rocky has it
+        # only in EPEL); their meta/main.yml declares Debian only.
+        exclude:
+          - { role: restic_server, platform: rocky10 }
+          - { role: backup, platform: rocky10 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
@@ -54,7 +59,7 @@ jobs:
     name: e2e (docker lab)
     needs: lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
@@ -75,11 +80,17 @@ jobs:
       - name: Failed deploy rolls back
         run: make test-rollback ENV=docker
 
+      - name: Backup restores with identical row counts
+        run: make restore-test ENV=docker
+
+      - name: Breaking the app and an exporter fires the alerts
+        run: make alert-test ENV=docker
+
       - name: Collect logs
         if: failure()
         run: |
           mkdir -p logs
-          for node in lab-lb lab-app1 lab-app2 lab-db; do
+          for node in lab-lb lab-app1 lab-app2 lab-db lab-ops; do
             docker exec "$node" journalctl --no-pager -n 300 > "logs/$node-journal.txt" 2>&1 || true
           done
           docker exec lab-lb cat /var/log/nginx/access.log > logs/nginx-access.log 2>&1 || true
