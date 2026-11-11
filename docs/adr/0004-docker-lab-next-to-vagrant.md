@@ -35,6 +35,11 @@ The docker lab cannot test:
   target. The first run on the Vagrant boxes found two such gaps that every
   container test had passed: `python3-libsemanage` for `seboolean` on Rocky
   and `python3-packaging` for the `pip` module. Both roles now install them.
+- the guest kernel: containers share the host's kernel, so they cannot show
+  what a service does on the target's. node_exporter passed Molecule on
+  Rocky containers, then was killed by its seccomp filter on the Rocky VMs
+  (kernel 6.12 el10), where it tries the new mount API (`fsopen`,
+  `open_tree`). The unit now returns `EPERM` for filtered calls instead.
 
 nftables does work: each container has its own network namespace, so the
 firewall rules are tested for real (the e2e checks that `lb` cannot reach
