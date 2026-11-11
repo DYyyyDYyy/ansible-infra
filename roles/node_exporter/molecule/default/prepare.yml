@@ -1,0 +1,22 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install curl for the tests (the common role does this on real hosts)
+      ansible.builtin.package:
+        name: curl
+        state: present
+        update_cache: "{{ ansible_facts['os_family'] == 'Debian' }}"
+
+    # Stand-in for a job that reports a metric, e.g. the backup timer.
+    - name: Create the textfile directory early
+      ansible.builtin.file:
+        path: /var/lib/node_exporter/textfile
+        state: directory
+        mode: "0755"
+
+    - name: Drop a textfile metric
+      ansible.builtin.copy:
+        dest: /var/lib/node_exporter/textfile/molecule.prom
+        content: "molecule_test_metric 42\n"
+        mode: "0644"
