@@ -1,0 +1,46 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Prometheus node_exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=node_exporter
+Group=node_exporter
+ExecStart=/opt/node_exporter-{{ node_exporter_version }}/node_exporter \
+    --web.listen-address={{ node_exporter_listen_address }}:{{ node_exporter_port }} \
+    --collector.textfile.directory={{ node_exporter_textfile_dir }}
+Restart=on-failure
+RestartSec=2
+
+# --- Sandboxing ---
+# It only reads /proc and /sys and serves HTTP. ProtectHome is read-only
+# rather than yes, so the filesystem collector can still statfs /home.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+# The timex collector reads the clock state with adjtimex(2), which is in
+# @clock (part of @privileged): without this line seccomp kills the process
+# on its first scrape. Read-only use is fine: changing the clock would also
+# need CAP_SYS_TIME, which the empty CapabilityBoundingSet removes. For the
+# same reason ProtectClock is not set (it blocks adjtimex as well).
+SystemCallFilter=adjtimex
+
+[Install]
+WantedBy=multi-user.target
