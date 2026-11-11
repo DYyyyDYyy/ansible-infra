@@ -1,0 +1,71 @@
+---
+- name: Check variables
+  ansible.builtin.assert:
+    that:
+      - upstream_binary_name | length > 0
+      - upstream_binary_github | length > 0
+      - upstream_binary_version is regex('^[0-9]')
+      - upstream_binary_file is search('linux[-_]amd64')
+      - upstream_binary_sha256 is regex('^[0-9a-f]{64}$')
+      # The pinned checksums are for amd64 tarballs only.
+      - ansible_facts['architecture'] == 'x86_64'
+    fail_msg: "upstream_binary needs a name, a GitHub repo, a version, an amd64 tarball and its sha256 (got {{ upstream_binary_url }})"
+    quiet: true
+
+# Runs on the controller without sudo. become is switched off explicitly:
+# the calling play has become: true, which would otherwise try to sudo on
+# the machine running Ansible.
+- name: Download {{ upstream_binary_file }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  block:
+    - name: Create the download cache
+      ansible.builtin.file:
+        path: "{{ upstream_binary_cache_dir }}"
+        state: directory
+        mode: "0755"
+
+    # With checksum set, get_url skips the download when the cached file
+    # already has the right hash, and fails if a fresh download does not.
+    - name: Download and verify {{ upstream_binary_file }}
+      ansible.builtin.get_url:
+        url: "{{ upstream_binary_url }}"
+        dest: "{{ upstream_binary_cache_dir }}/{{ upstream_binary_file }}"
+        checksum: sha256:{{ upstream_binary_sha256 }}
+        mode: "0644"
+
+- name: Create {{ upstream_binary_dest }}
+  ansible.builtin.file:
+    path: "{{ upstream_binary_dest }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Each version gets its own directory and is never modified afterwards, so
+# `creates` is enough to make this idempotent.
+- name: Unpack into {{ upstream_binary_dest }}
+  ansible.builtin.unarchive:
+    src: "{{ upstream_binary_cache_dir }}/{{ upstream_binary_file }}"
+    dest: "{{ upstream_binary_dest }}"
+    extra_opts: [--strip-components=1, --no-same-owner]
+    owner: root
+    group: root
+    creates: "{{ upstream_binary_dest }}/{{ upstream_binary_name }}"
+
+# Not every release tarball marks its binary executable: rest-server 0.14.0
+# ships it as 0644, and systemd fails with "203/EXEC: Permission denied".
+- name: Make the executables executable
+  ansible.builtin.file:
+    path: "{{ upstream_binary_dest }}/{{ item }}"
+    mode: "0755"
+  loop: "{{ [upstream_binary_name] + upstream_binary_links }}"
+
+- name: Link CLI tools into /usr/local/bin
+  ansible.builtin.file:
+    src: "{{ upstream_binary_dest }}/{{ item }}"
+    dest: /usr/local/bin/{{ item }}
+    state: link
+    force: true
+  loop: "{{ upstream_binary_links }}"
