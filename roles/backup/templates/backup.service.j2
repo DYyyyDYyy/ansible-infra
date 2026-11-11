@@ -1,0 +1,43 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Back up PostgreSQL into restic
+After=postgresql.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=backup_pg
+Group=backup_pg
+EnvironmentFile=/etc/restic/backup.env
+Environment=RESTIC_CACHE_DIR=/var/cache/backup
+CacheDirectory=backup
+ExecStart=/usr/local/sbin/pg-backup
+# "+": runs with full privileges, outside the sandbox below. Only reached
+# when ExecStart succeeded.
+ExecStartPost=+/usr/local/sbin/backup-mark-success
+Nice=10
+IOSchedulingClass=idle
+
+# --- Sandboxing ---
+# Reads PostgreSQL over its Unix socket, talks HTTP to the backup server,
+# writes only its cache.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077

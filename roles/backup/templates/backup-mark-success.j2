@@ -1,0 +1,16 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# Runs as root after a successful backup (ExecStartPost=+ in backup.service)
+# and publishes the time for node_exporter's textfile collector. Written to a
+# temporary file in the same directory and renamed, so node_exporter never
+# reads a half-written file.
+set -eu
+dir={{ backup_textfile_dir }}
+tmp=$(mktemp "$dir/.backup.prom.XXXXXX")
+cat >"$tmp" <<METRICS
+# HELP backup_last_success_timestamp_seconds Unix time of the last successful database backup.
+# TYPE backup_last_success_timestamp_seconds gauge
+backup_last_success_timestamp_seconds $(date +%s)
+METRICS
+chmod 0644 "$tmp"
+mv "$tmp" "$dir/backup.prom"

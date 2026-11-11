@@ -1,0 +1,19 @@
+---
+# Hourly pg_dump of each database into a restic repository on a rest-server
+# (see the restic_server role). restic encrypts and deduplicates on this
+# host; the server only stores ciphertext and is append-only.
+
+# rest:http://<server>:<port>/<user>/
+backup_repository: ""
+backup_rest_user: ""
+backup_rest_password: ""      # HTTP login for rest-server, from Ansible Vault
+backup_restic_password: ""    # encrypts the repository, from Ansible Vault
+
+backup_databases: []
+
+backup_on_calendar: hourly
+backup_randomized_delay: 5min
+
+# Written after every successful run, read by node_exporter's textfile
+# collector; the BackupTooOld alert is built on it.
+backup_textfile_dir: /var/lib/node_exporter/textfile

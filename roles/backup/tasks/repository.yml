@@ -1,0 +1,43 @@
+---
+# The same environment the service gets from /etc/restic/backup.env.
+- name: Set the restic environment
+  ansible.builtin.set_fact:
+    backup_restic_env:
+      RESTIC_REPOSITORY: "{{ backup_repository }}"
+      RESTIC_REST_USERNAME: "{{ backup_rest_user }}"
+      RESTIC_REST_PASSWORD: "{{ backup_rest_password }}"
+      RESTIC_PASSWORD: "{{ backup_restic_password }}"
+  no_log: true
+
+# Exit code 10 means "no repository at this location" (restic >= 0.17).
+# restic retries network errors for minutes, hence the timeout: an
+# unreachable server should fail the play, not hang it.
+- name: Check whether the repository exists
+  ansible.builtin.command: restic --no-cache cat config
+  environment: "{{ backup_restic_env }}"
+  register: backup_repo_check
+  changed_when: false
+  failed_when: backup_repo_check.rc not in [0, 10]
+  timeout: 120
+
+- name: Initialise the repository
+  ansible.builtin.command: restic --no-cache init
+  environment: "{{ backup_restic_env }}"
+  when: backup_repo_check.rc == 10
+  changed_when: true
+  timeout: 120
+
+# Without this the first backup would wait for the timer, and until then
+# there is no backup and no freshness metric to alert on.
+- name: Look for an existing snapshot
+  ansible.builtin.command: restic --no-cache snapshots --json --latest 1
+  environment: "{{ backup_restic_env }}"
+  register: backup_snapshots
+  changed_when: false
+  timeout: 120
+
+- name: Take the first backup now
+  ansible.builtin.systemd_service:
+    name: backup.service
+    state: started
+  when: backup_snapshots.stdout | from_json | length == 0
