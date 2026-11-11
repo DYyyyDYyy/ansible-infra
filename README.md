@@ -189,6 +189,13 @@ five Vagrant VMs):
 | SELinux | n/a in containers | Enforcing, 0 AVC denials; nginx in `httpd_t`, services in `unconfined_service_t` |
 | Full `make e2e` | 17 minutes | — |
 
+GitHub Actions runs the same lint, Molecule matrix and e2e on every push.
+Its first run found four problems that never showed up locally (a flushed
+ruleset deleting Docker's DNS rules, EL's nftables reload flushing too,
+ANSI colours in parsed output, and the runner's AppArmor profile for
+`unix_chkpwd` reaching into the Rocky containers); each is fixed in its
+own commit with the reason in the message.
+
 
 ## Backups
 
