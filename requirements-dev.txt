@@ -1,5 +1,5 @@
 # Controller-side tooling. Install with: make venv
-ansible-core==2.21.6
+ansible-core==2.22.0
 ansible-lint==26.11.0
 molecule==26.11.0
 molecule-plugins[docker]==26.11.0
