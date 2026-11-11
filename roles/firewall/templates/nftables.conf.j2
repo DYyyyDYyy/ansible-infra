@@ -20,7 +20,14 @@
 {% endif %}
 {% endmacro %}
 
-flush ruleset
+# Replace only this role's table, never the whole ruleset: Docker, Podman
+# and libvirt keep their own tables (Docker's embedded DNS, for one, is a
+# DNAT rule inside each container), and `flush ruleset` would delete them.
+# Declaring the table first makes `delete` safe on the very first load; nft
+# applies the file as one transaction, so the old table is never gone
+# without the new one in place.
+table inet filter
+delete table inet filter
 
 table inet filter {
     chain input {

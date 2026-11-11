@@ -308,8 +308,9 @@ Runbooks: [disk full](docs/runbooks/disk-full.md) ·
 - **What the docker lab cannot test:** SELinux, the kernel and boot, SSH as
   the transport, and packages missing from minimal images. Those paths only
   run on the Vagrant VMs (ADR 4).
-- **The firewall role flushes the whole ruleset**, so it must not run on hosts
-  with Docker, Podman or libvirt.
+- **The firewall drops forwarded traffic**, so it does not suit hosts that
+  route for containers or VMs (Docker, Podman, libvirt). It replaces only its
+  own nftables table and leaves other tools' tables alone (ADR 5).
 - **Lab shortcuts:** `host_key_checking = False` in `ansible.cfg` because the
   VMs are recreated often, and privileged containers in the docker lab.
 - **Rocky on Vagrant needs three workarounds**, all in the `Vagrantfile`: the

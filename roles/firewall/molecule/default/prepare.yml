@@ -1,0 +1,18 @@
+---
+# A table owned by someone else, shaped like the one Docker creates in each
+# container for its embedded DNS. The role must leave it alone.
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Install nftables
+      ansible.builtin.package:
+        name: nftables
+        state: present
+        update_cache: "{{ ansible_facts['os_family'] == 'Debian' }}"
+
+    - name: Create a foreign NAT table
+      ansible.builtin.shell: |
+        nft add table ip foreign_dns
+        nft add chain ip foreign_dns output '{ type nat hook output priority -100; }'
+        nft add rule ip foreign_dns output ip daddr 127.0.0.11 udp dport 53 dnat to 127.0.0.11:5353
+      changed_when: true

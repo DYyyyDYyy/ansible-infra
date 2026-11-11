@@ -2,9 +2,14 @@
 # Inbound policy is drop. Loopback, established/related traffic, ICMP and SSH
 # are always allowed; everything else must be listed in firewall_rules.
 #
-# WARNING: the generated ruleset starts with `flush ruleset`, which also wipes
-# chains created by Docker, Podman or libvirt. Do not apply this role to hosts
-# that run containers or VMs.
+# The role owns one table, `inet filter`, and replaces only that one, so
+# tables created by others survive a reload (Docker's DNAT rules for its
+# embedded DNS, for one). Their accept rules cannot open anything this table
+# drops: a packet has to pass every base chain on the same hook.
+#
+# WARNING: the forward chain's policy is drop, so on a host that routes
+# traffic for containers or VMs (Docker, Podman, libvirt) that traffic is
+# blocked. Do not apply this role to such hosts as it is.
 
 firewall_ssh_port: 22
 # Empty list: SSH from anywhere (keys only, see the common role).

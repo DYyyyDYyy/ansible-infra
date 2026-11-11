@@ -1,8 +1,12 @@
 ---
-# The file begins with `flush ruleset` and nft applies a file as one
-# transaction, so a reload swaps the whole ruleset atomically: there is no
+# The file deletes and recreates the role's table, and nft applies a file as
+# one transaction, so loading it swaps the table atomically: there is no
 # moment when the old rules are gone and the new ones are not loaded yet.
+#
+# Not `systemctl reload nftables`: on EL its ExecReload is
+# `nft 'flush ruleset; include ...'`, which would delete every other table
+# (found by the firewall Molecule test on Rocky). nftables.service still
+# loads the same file at boot, with ExecStart=nft -f <file>.
 - name: Reload nftables
-  ansible.builtin.systemd_service:
-    name: nftables
-    state: reloaded
+  ansible.builtin.command: nft -f {{ firewall_config_path }}
+  changed_when: true

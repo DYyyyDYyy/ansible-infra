@@ -7,10 +7,20 @@ import pytest
 
 @pytest.fixture(scope="module")
 def ruleset(host):
-    data = json.loads(host.check_output("nft -j list ruleset"))["nftables"]
+    data = json.loads(host.check_output("nft -j list table inet filter"))["nftables"]
     chains = {c["chain"]["name"]: c["chain"] for c in data if "chain" in c}
     rules = [r["rule"] for r in data if "rule" in r]
     return chains, rules
+
+
+def test_other_tables_survive(host):
+    # prepare.yml created it before the role ran twice (converge, idempotence).
+    # `flush ruleset` used to delete it, which broke Docker's embedded DNS in
+    # the docker lab on GitHub's runners.
+    tables = json.loads(host.check_output("nft -j list tables"))["nftables"]
+    names = {(t["table"]["family"], t["table"]["name"]) for t in tables if "table" in t}
+    assert ("ip", "foreign_dns") in names
+    assert ("inet", "filter") in names
 
 
 def rule_by_comment(rules, comment):
