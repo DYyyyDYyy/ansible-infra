@@ -1,4 +1,4 @@
 ---
-firewall_rules:
+firewall_group_rules:
   - name: http
     port: 80

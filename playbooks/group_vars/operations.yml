@@ -1,0 +1,30 @@
+---
+# The ops host: backup storage (rest-server) and monitoring.
+
+restic_server_listen_address: "{{ private_ip }}"
+restic_server_port: "{{ backup_rest_port }}"
+restic_server_users:
+  - name: "{{ backup_rest_user }}"
+    password: "{{ vault_backup_password }}"
+# Clients are append-only; retention runs here and needs the repo password.
+restic_server_maintained_repos:
+  - name: "{{ backup_rest_user }}"
+    password: "{{ vault_restic_password }}"
+
+monitoring_targets:
+  - { job: node, port: 9100, hosts: "{{ groups['all'] }}" }
+  - { job: postgres, port: 9187, hosts: "{{ groups['database'] }}" }
+monitoring_probe_urls:
+  - http://{{ hostvars[groups['loadbalancer'][0]]['private_ip'] }}/health
+  - http://{{ hostvars[groups['loadbalancer'][0]]['private_ip'] }}/vehicles
+monitoring_telegram_bot_token: "{{ vault_telegram_bot_token }}"
+monitoring_telegram_chat_id: "{{ vault_telegram_chat_id }}"
+
+# Prometheus, Alertmanager and blackbox listen on localhost only; admins
+# reach the UIs with `ssh -L`, so local forwarding is allowed on this host.
+common_sshd_allow_tcp_forwarding: local
+
+firewall_group_rules:
+  - name: rest-server-from-db
+    port: "{{ backup_rest_port }}"
+    sources: "{{ groups['database'] | map('extract', hostvars, 'private_ip') | list }}"

@@ -11,7 +11,17 @@ postgresql_hba_entries:
     user: "{{ app_db_user }}"
     address: "{{ groups['app'] | map('extract', hostvars, 'private_ip') | map('regex_replace', '$', '/32') | list }}"
 
-firewall_rules:
+postgres_exporter_listen_address: "{{ private_ip }}"
+
+backup_repository: rest:http://{{ ops_ips[0] }}:{{ backup_rest_port }}/{{ backup_rest_user }}/
+backup_rest_password: "{{ vault_backup_password }}"
+backup_restic_password: "{{ vault_restic_password }}"
+backup_databases: ["{{ app_db_name }}"]
+
+firewall_group_rules:
   - name: postgres-from-app
     port: 5432
     sources: "{{ groups['app'] | map('extract', hostvars, 'private_ip') | list }}"
+  - name: postgres-exporter-from-ops
+    port: 9187
+    sources: "{{ ops_ips }}"

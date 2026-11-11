@@ -7,3 +7,7 @@ lab_public_url: http://127.0.0.1:8080
 #     - name: alice
 #       ssh_keys: ["{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"]
 common_admin_users: []
+
+# Lab: alerts fire after 30s instead of 5m, so the alert test is quick.
+monitoring_alert_for: 30s
+monitoring_scrape_interval: 5s

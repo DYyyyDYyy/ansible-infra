@@ -2,7 +2,7 @@
 app_bind_address: "{{ private_ip }}"
 app_forwarded_allow_ips: "{{ groups['loadbalancer'] | map('extract', hostvars, 'private_ip') | join(',') }}"
 
-firewall_rules:
+firewall_group_rules:
   - name: app-from-lb
     port: "{{ app_port }}"
     sources: "{{ groups['loadbalancer'] | map('extract', hostvars, 'private_ip') | list }}"

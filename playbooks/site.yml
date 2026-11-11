@@ -8,12 +8,23 @@
   roles:
     - common
     - firewall
+    - node_exporter
+
+# Before the database: the backup role initialises its repository here.
+- name: Backup storage and monitoring
+  hosts: operations
+  become: true
+  roles:
+    - restic_server
+    - monitoring
 
 - name: Database
   hosts: database
   become: true
   roles:
     - postgresql
+    - postgres_exporter
+    - backup
 
 - name: Load balancer
   hosts: loadbalancer
