@@ -29,7 +29,10 @@ def test_admin_can_sudo_without_password(host):
     result = host.run("sudo -u alice sudo -n true")
     account = host.run(
         "chage -l alice; getent shadow alice | cut -d: -f2-; "
-        "journalctl --no-pager -n 15 _COMM=sudo; rpm -q pam sudo shadow-utils 2>/dev/null"
+        "journalctl --no-pager -n 15 _COMM=sudo; rpm -q pam sudo shadow-utils 2>/dev/null; "
+        "ls -l /etc/shadow /usr/bin/sudo /usr/sbin/unix_chkpwd; getcap /usr/sbin/unix_chkpwd; "
+        "grep -E '^(passwd|shadow):' /etc/nsswitch.conf; grep -E '^account' /etc/pam.d/system-auth; "
+        "sudo -u alice grep -E '^Cap(Prm|Eff|Bnd)' /proc/self/status; grep -E '^(Cap|NoNewPrivs|Seccomp)' /proc/1/status"
     ).stdout
     assert result.rc == 0, f"{result.stderr}\n{account}"
 
