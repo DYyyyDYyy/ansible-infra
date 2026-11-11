@@ -27,7 +27,10 @@ def test_sudoers_dropin_is_valid(host):
 def test_admin_can_sudo_without_password(host):
     # -n: fail instead of prompting for a password
     result = host.run("sudo -u alice sudo -n true")
-    account = host.run("chage -l alice; getent shadow alice | cut -d: -f2-").stdout
+    account = host.run(
+        "chage -l alice; getent shadow alice | cut -d: -f2-; "
+        "journalctl --no-pager -n 15 _COMM=sudo; rpm -q pam sudo shadow-utils 2>/dev/null"
+    ).stdout
     assert result.rc == 0, f"{result.stderr}\n{account}"
 
 
