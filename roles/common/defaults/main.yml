@@ -17,6 +17,9 @@ common_sshd_max_auth_tries: 3
 # Empty list: do not restrict by group. Careful: if set, include the group of
 # the user Ansible connects as (e.g. vagrant), or you lock yourself out.
 common_sshd_allow_groups: []
+# "no", or "local" to allow `ssh -L` tunnels only (used on the monitoring
+# host, whose web UIs listen on localhost). Quoted: a bare no is a boolean.
+common_sshd_allow_tcp_forwarding: "no"
 
 # Install security updates automatically (unattended-upgrades / dnf-automatic).
 common_auto_updates: true
