@@ -1,0 +1,12 @@
+---
+postgres_exporter_version: 0.20.1
+postgres_exporter_sha256: 89d4f7e7920cad48fdc3133f789556ef5253c330a9f5fdace3bdb6344c0a8b5a
+
+postgres_exporter_listen_address: 127.0.0.1
+postgres_exporter_port: 9187
+
+# Connects over the Unix socket with peer authentication: the OS account and
+# the database role share the name postgres_exporter, so no password exists.
+# The role gets pg_monitor, which can read statistics but no table data.
+postgres_exporter_socket_dir: /run/postgresql
+postgres_exporter_postgresql_port: 5432
