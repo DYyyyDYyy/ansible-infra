@@ -2,7 +2,7 @@
 
 **What happens automatically:** if anything fails after a host was taken out
 of nginx, `deploy.yml` points `current` back to the previous release,
-restarts it, checks `/health`, puts the host back into nginx and stops. Hosts
+restarts it, checks `/health/ready` (process up and database reachable), puts the host back into nginx and stops. Hosts
 after it are never touched, so the site keeps running on the old version.
 
 ## 1. Read the failure

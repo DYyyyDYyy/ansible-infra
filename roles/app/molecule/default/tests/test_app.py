@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-RELEASE = "/opt/transport-api/releases/fd3fea549ecb92ee7ff98fd5638e0ccfcbc4aabc"
+RELEASE = "/opt/transport-api/releases/700b12e56f410f06d7c0112628b74b1ae2dd4c37"
 
 
 def test_service_running_as_service_account(host):
@@ -37,6 +37,11 @@ def test_env_file_is_private(host):
 def test_health_endpoint(host):
     out = host.check_output("curl -fsS http://127.0.0.1:8000/health")
     assert json.loads(out) == {"status": "ok"}
+
+
+def test_ready_endpoint_checks_database(host):
+    out = host.check_output("curl -fsS http://127.0.0.1:8000/health/ready")
+    assert json.loads(out) == {"status": "ok", "database": "ok"}
 
 
 def test_api_reads_from_database(host):

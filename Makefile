@@ -23,8 +23,8 @@ LB_URL_docker := http://127.0.0.1:8080
 LB_URL := $(LB_URL_$(ENV))
 
 # Two real commits of rest-api-transport-firm, used by the deploy demo/tests
-APP_OLD := def475af343b98ff25ab5b253d328745f3378a20
-APP_NEW := fd3fea549ecb92ee7ff98fd5638e0ccfcbc4aabc
+APP_OLD := 700b12e56f410f06d7c0112628b74b1ae2dd4c37
+APP_NEW := a07d9d0b7e4ea729bc5110a26d96b1424e6fb964
 
 .PHONY: help venv lint test vault-init up provision deploy check-idempotence \
 	zero-downtime test-rollback restore-test alert-test e2e lab-up lab-down down

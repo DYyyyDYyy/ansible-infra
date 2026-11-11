@@ -129,11 +129,11 @@ sequenceDiagram
     A->>H: check out release, build its venv (still serving the old one)
     A->>H: alembic upgrade head (first host does the work)
     A->>LB: mark host down, reload
-    A->>H: switch current symlink, restart, wait for /health, smoke test
+    A->>H: switch current symlink, restart, wait for /health/ready, smoke test
     alt release is healthy
         A->>LB: put host back, reload
     else health or smoke test failed
-        A->>H: symlink back to previous release, restart, wait for /health
+        A->>H: symlink back to previous release, restart, wait for /health/ready
         A->>LB: put host back, reload
         A--xA: stop: remaining hosts keep the old version
     end
@@ -304,11 +304,6 @@ Runbooks: [disk full](docs/runbooks/disk-full.md) ·
   the private network (restic encrypts the data, but the HTTP password
   travels in clear text); database roles are not in the dump, Ansible
   recreates them. `ops` holds the repository password because it prunes.
-- **`/health` does not check the database.** The API only has a liveness
-  endpoint so far; `/health/ready` is in review
-  ([rest-api-transport-firm#1](https://github.com/DYyyyDYyy/rest-api-transport-firm/pull/1)).
-  After it is merged, `app_health_path` becomes `/health/ready` and
-  `app_version` the merge commit.
 - **Pinned upstream binaries are upgraded by hand** (version and SHA256 in
   the role defaults; Dependabot does not see them), and only amd64
   checksums are pinned.
@@ -337,7 +332,6 @@ Runbooks: [disk full](docs/runbooks/disk-full.md) ·
 
 ## Roadmap
 
-- Switch the health check to `/health/ready` once the API PR is merged.
 - An off-site copy of the backups (`restic copy` to object storage) and TLS
   on rest-server.
 - A dead man's switch, so a dead `ops` host is noticed too.

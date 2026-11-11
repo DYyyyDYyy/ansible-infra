@@ -6,7 +6,7 @@ app_home: /opt/{{ app_name }}
 app_repo: https://github.com/DYyyyDYyy/rest-api-transport-firm.git
 # Must be a tag or a full commit SHA. A branch name would make the same
 # version string mean different code on different days.
-app_version: fd3fea549ecb92ee7ff98fd5638e0ccfcbc4aabc
+app_version: 700b12e56f410f06d7c0112628b74b1ae2dd4c37
 
 app_bind_address: 127.0.0.1
 app_port: 8000
@@ -23,9 +23,9 @@ app_database_url: "postgresql+psycopg2://{{ app_db_user }}:{{ app_db_password | 
 
 app_run_migrations: true
 
-# Liveness check after every (re)start. Switch to /health/ready once the API
-# has an endpoint that also checks the database.
-app_health_path: /health
+# Checked after every (re)start. /health/ready also runs SELECT 1, so a release
+# that starts but cannot reach PostgreSQL is not put back behind nginx.
+app_health_path: /health/ready
 # Checked only after switching to a NEW release. A deploy pipeline points this
 # at a smoke test; CI points it at a missing page to exercise the rollback.
 app_smoke_test_path: "{{ app_health_path }}"
