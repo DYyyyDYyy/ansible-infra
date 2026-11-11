@@ -12,7 +12,6 @@ export ANSIBLE_COLLECTIONS_PATH := $(CURDIR)/.collections
 
 INVENTORY := inventories/$(ENV)
 VAULT_PASS := .vault_pass
-VAULT_FILE := $(INVENTORY)/group_vars/all/vault.yml
 PLAYBOOK_ARGS = -i $(INVENTORY) --vault-password-file $(VAULT_PASS)
 PLAYBOOK = ansible-playbook $(PLAYBOOK_ARGS)
 ROLES := $(notdir $(wildcard roles/*))
@@ -56,12 +55,12 @@ test: venv ## Molecule for every role, or: make test ROLE=firewall PLATFORM=rock
 
 ## --- Environments -----------------------------------------------------------
 
-$(VAULT_FILE):
-	scripts/vault-init.sh $(ENV)
+# Always runs: the script only adds the secrets this vault is missing, so an
+# old clone picks up secrets introduced later (and nothing else changes).
+vault-init: venv ## Generate and encrypt this environment's secrets (adds missing ones)
+	@scripts/vault-init.sh $(ENV)
 
-vault-init: venv $(VAULT_FILE) ## Generate and encrypt this environment's secrets
-
-up: venv $(VAULT_FILE) ## Create the machines and provision everything
+up: venv vault-init ## Create the machines and provision everything
 ifeq ($(ENV),vagrant)
 	vagrant up
 else
@@ -69,10 +68,10 @@ else
 endif
 	$(MAKE) provision
 
-provision: venv $(VAULT_FILE) ## Run playbooks/site.yml
+provision: venv vault-init ## Run playbooks/site.yml
 	$(PLAYBOOK) playbooks/site.yml
 
-deploy: venv $(VAULT_FILE) ## Rolling deploy: make deploy VERSION=<sha|tag>
+deploy: venv vault-init ## Rolling deploy: make deploy VERSION=<sha|tag>
 	$(PLAYBOOK) playbooks/deploy.yml $(if $(VERSION),-e app_version=$(VERSION))
 
 down: ## Destroy the machines
@@ -95,15 +94,15 @@ lab-down: venv ## Remove the docker lab containers
 
 ## --- Checks against a running environment ---------------------------------
 
-check-idempotence: venv $(VAULT_FILE) ## Re-run site.yml and fail if anything changes
+check-idempotence: venv vault-init ## Re-run site.yml and fail if anything changes
 	scripts/check-idempotence.sh $(PLAYBOOK_ARGS) playbooks/site.yml
 
-zero-downtime: venv $(VAULT_FILE) ## Deploy APP_OLD then APP_NEW under load, fail on any error
+zero-downtime: venv vault-init ## Deploy APP_OLD then APP_NEW under load, fail on any error
 	$(PLAYBOOK) playbooks/deploy.yml -e app_version=$(APP_OLD)
 	scripts/zero-downtime.sh $(LB_URL)/vehicles -- \
 		$(PLAYBOOK) playbooks/deploy.yml -e app_version=$(APP_NEW)
 
-test-rollback: venv $(VAULT_FILE) ## Deploy a release whose smoke test fails, expect a rollback
+test-rollback: venv vault-init ## Deploy a release whose smoke test fails, expect a rollback
 	scripts/rollback-test.sh $(LB_URL) $(APP_OLD) $(APP_NEW) $(PLAYBOOK_ARGS)
 
 e2e: ## Full CI run on the docker lab: up, idempotence, zero-downtime, rollback
