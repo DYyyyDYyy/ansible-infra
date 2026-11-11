@@ -9,6 +9,11 @@ behind a load balancer, with hourly backups and alerting. `make deploy` ships a
 new version one server at a time without dropping a single request, and rolls
 back by itself if the new version is broken.
 
+![Rolling deploy under load: 1852 requests, 0 failed](docs/demo.gif)
+
+*`make zero-downtime` in the docker lab, sped up 2×: both app servers are
+updated one at a time while `curl` hits the load balancer every 20 ms.*
+
 ## What it shows
 
 - **Idempotent configuration management.** A second run of the playbook reports
@@ -75,10 +80,11 @@ Alertmanager (9093) and blackbox_exporter (9115) listen on `127.0.0.1` on
 `ops` is a fifth machine on purpose: a backup on the server it protects is
 not a backup, and monitoring should not go down with what it watches.
 
-**Demo:** [`docs/demo.cast`](docs/demo.cast), a 2-minute terminal recording
-of `make zero-downtime` in the docker lab: a rolling deploy while `curl`
-hits the load balancer every 20 ms, ending in `requests: 1852   failed: 0`.
-Play it with `asciinema play docs/demo.cast` (`uv tool run asciinema play
+**Demo:** the GIF at the top is rendered with
+[agg](https://github.com/asciinema/agg) from
+[`docs/demo.cast`](docs/demo.cast), the original 2-minute terminal
+recording of `make zero-downtime`. Play it at real speed with
+`asciinema play docs/demo.cast` (`uv tool run asciinema play
 docs/demo.cast` works without installing anything).
 
 ## Quick start
